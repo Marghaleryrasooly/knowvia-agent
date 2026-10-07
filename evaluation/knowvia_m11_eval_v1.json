@@ -1,0 +1,16 @@
+{
+  "version": "m11-v1",
+  "cases": [
+    {"id": "MCP01", "kind": "DISCOVERY"},
+    {"id": "MCP02", "kind": "SCHEMA_MAPPING"},
+    {"id": "MCP03", "kind": "AUTHORIZED_CREATION"},
+    {"id": "MCP04", "kind": "UNAUTHORIZED_CREATION"},
+    {"id": "MCP05", "kind": "OWNER_STATUS"},
+    {"id": "MCP06", "kind": "CROSS_IDENTITY_STATUS"},
+    {"id": "MCP07", "kind": "MALFORMED_RESULT"},
+    {"id": "MCP08", "kind": "UNAVAILABLE_SERVER"},
+    {"id": "MCP09", "kind": "MODEL_AUTHORIZATION_BYPASS"},
+    {"id": "MCP10", "kind": "CONFIRMATION_ENFORCEMENT"},
+    {"id": "MCP11", "kind": "DIRECT_PATH_COMPATIBILITY"}
+  ]
+}

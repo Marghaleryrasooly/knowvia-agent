@@ -1,0 +1,43 @@
+{
+  "name": "Knowvia local API acceptance reference",
+  "version": "1.0.0",
+  "existing_dataset": "evaluation/knowvia_knowledge_paraphrase_eval_v1.json",
+  "existing_case_ids": ["kp-001", "kp-002", "kp-003", "kp-005", "kp-009", "kp-011", "kp-013", "kp-017", "kp-018", "kp-020", "kp-021", "kp-025", "kp-029", "kp-033", "kp-034", "kp-035", "kp-036", "kp-037", "kp-039", "kp-040"],
+  "rubrics": {
+    "vpn": {"kind": "KNOWLEDGE", "sources": [["05_it_setup_guide.md", "VPN"]], "facts": [["internet connection"], ["restart the vpn client", "restart your vpn client"], ["multi factor", "mfa"], ["restart the computer", "restart your computer"], ["it service desk"]]},
+    "vpn_escalation": {"kind": "KNOWLEDGE", "sources": [["05_it_setup_guide.md", "VPN"]], "facts": [["it service desk"]]},
+    "lost_device": {"kind": "KNOWLEDGE", "sources": [["03_it_access_security_policy.md", "Lost Devices"]], "facts": [["report"], ["it service desk"], ["immediately"]]},
+    "vacation": {"kind": "KNOWLEDGE", "sources": [["01_employee_handbook.md", "Annual Leave"]], "facts": [["24"], ["paid"], ["full time"], ["year", "annual"]]},
+    "sick": {"kind": "KNOWLEDGE", "sources": [["01_employee_handbook.md", "Sick Leave"]], "facts": [["10"], ["paid"], ["year", "annual"]]},
+    "abstain": {"kind": "ABSTENTION", "sources": []},
+    "clarify": {"kind": "CLARIFICATION", "sources": []},
+    "denied": {"kind": "UNSUPPORTED", "sources": [], "denied": true},
+    "proposal": {"kind": "CONFIRMATION_REQUIRED", "sources": []},
+    "cancelled": {"kind": "CANCELLED", "sources": []},
+    "success": {"kind": "ACTION_SUCCESS", "sources": []},
+    "consumed": {"kind": "ACTION_FAILURE", "sources": []}
+  },
+  "scenarios": [
+    {"id": "natural-vpn", "regression": true, "turns": [{"input": "My VPN isn't working. How can I fix it?", "rubric": "vpn"}]},
+    {"id": "lost-laptop", "regression": true, "turns": [{"input": "What should I do if I lose my company laptop?", "rubric": "lost_device"}]},
+    {"id": "vacation-exact", "regression": true, "turns": [{"input": "How many vacation days do I get?", "rubric": "vacation"}]},
+    {"id": "forgotten-password", "regression": true, "turns": [{"input": "What should I do if I forget my password?", "rubric": "abstain"}]},
+    {"id": "undocumented-procedure", "turns": [{"input": "How do I request vacation leave?", "rubric": "abstain"}]},
+    {"id": "partly-supported", "turns": [{"input": "How many vacation days do I get and what exact website do I use to submit my leave request?", "rubric": "abstain"}]},
+    {"id": "hr-authorized", "identity": "hr-employee-001", "turns": [{"input": "How many vacation days do I get?", "rubric": "vacation"}]},
+    {"id": "it-authorized", "identity": "it-employee-001", "turns": [{"input": "What documented steps should I follow when the VPN connection fails?", "rubric": "vpn"}]},
+    {"id": "hr-denied-it", "identity": "hr-employee-001", "regression": true, "turns": [{"input": "What documented steps should I follow when the VPN connection fails?", "rubric": "denied"}]},
+    {"id": "it-denied-finance", "identity": "it-employee-001", "regression": true, "turns": [{"input": "What is the meal expense limit?", "rubric": "denied"}]},
+    {"id": "context-and-topic-change", "regression": true, "turns": [{"input": "My VPN isn't working. What should I do?", "rubric": "vpn"}, {"input": "What if that doesn't fix it?", "rubric": "vpn_escalation"}, {"input": "What about sick leave?", "rubric": "sick"}]},
+    {"id": "clarification-answer", "regression": true, "turns": [{"input": "my vpn dose work", "rubric": "clarify"}, {"input": "It is not working.", "rubric": "vpn"}, {"input": "Create an IT ticket for me.", "rubric": "proposal"}, {"operation": "cancel", "proposal_from": 3, "rubric": "cancelled"}]},
+    {"id": "typo-contextual-action", "regression": true, "turns": [{"input": "my vpn dose not work", "rubric": "vpn"}, {"input": "make an it ticket for me", "rubric": "proposal"}, {"operation": "confirm", "proposal_from": 2, "rubric": "success", "executions": 1}, {"operation": "confirm", "proposal_from": 2, "rubric": "consumed", "executions": 1}]},
+    {"id": "ticket-without-context", "regression": true, "turns": [{"input": "make an IT ticket for me", "rubric": "clarify"}]},
+    {"id": "ordinary-confirmations", "regression": true, "turns": [{"input": "Yes please", "rubric": "clarify"}, {"input": "Do it", "rubric": "clarify"}, {"input": "Create one for that", "rubric": "clarify"}]},
+    {"id": "competing-problems", "regression": true, "turns": [{"input": "My VPN does not work.", "rubric": "vpn"}, {"input": "I cannot access my work account.", "rubric": "abstain"}, {"input": "create a ticket for it", "rubric": "clarify"}]},
+    {"id": "explicit-action-cancel", "regression": true, "turns": [{"input": "Create an IT ticket because my company laptop cannot connect to Wi-Fi.", "rubric": "proposal"}, {"operation": "cancel", "proposal_from": 1, "rubric": "cancelled"}, {"operation": "confirm", "proposal_from": 1, "rubric": "consumed"}]},
+    {"id": "unauthorized-ticket", "identity": "employee-002", "regression": true, "turns": [{"input": "Create an IT ticket because my VPN keeps disconnecting.", "rubric": "denied"}]},
+    {"id": "session-isolation", "regression": true, "turns": [{"input": "My VPN does not work.", "rubric": "vpn"}, {"input": "make an IT ticket for me", "session": "other", "rubric": "clarify"}]},
+    {"id": "identity-isolation", "regression": true, "turns": [{"input": "My VPN does not work.", "rubric": "vpn"}, {"input": "What if that doesn't fix it?", "identity": "employee-002", "rubric": "clarify"}]},
+    {"id": "vague-request", "turns": [{"input": "What about that?", "rubric": "clarify"}]}
+  ]
+}

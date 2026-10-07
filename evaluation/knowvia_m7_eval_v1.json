@@ -1,0 +1,17 @@
+{
+  "name": "knowvia_m7_presentation_v1",
+  "version": "1.0.0",
+  "cases": [
+    {"id":"K01","scenario":"KNOWLEDGE","expected_kind":"KNOWLEDGE","required_terms":["24 paid vacation days"],"expected_sources":[["01_employee_handbook.md","Annual Leave"]]},
+    {"id":"K02","scenario":"ABSTENTION","expected_kind":"ABSTENTION","required_terms":["couldn't find enough company information"],"expected_sources":[["05_information_classification.md","Confidential"]]},
+    {"id":"A01","scenario":"PROPOSED","expected_kind":"CONFIRMATION_REQUIRED","required_terms":["VPN problem","My VPN is broken","Would you like me to submit it?"],"confirmation_expected":true},
+    {"id":"A02","scenario":"JIRA_SUCCESS","expected_kind":"ACTION_SUCCESS","required_terms":["KIT-123","VPN problem"],"expected_identifier":"KIT-123","forbidden_terms":["within","response time","resolution time","will contact","will review","SLA"]},
+    {"id":"A03","scenario":"MOCK_SUCCESS","expected_kind":"ACTION_SUCCESS","required_terms":["IT-0001"],"expected_identifier":"IT-0001","forbidden_terms":["within","guaranteed","will contact","SLA"]},
+    {"id":"A04","scenario":"FAILURE","expected_kind":"ACTION_FAILURE","required_terms":["couldn't create","No successful ticket creation was confirmed"],"forbidden_terms":["Done","created IT ticket"]},
+    {"id":"A05","scenario":"AMBIGUOUS_FAILURE","expected_kind":"ACTION_FAILURE","required_terms":["couldn't verify","check Jira before trying again"],"forbidden_terms":["Done","created IT ticket"]},
+    {"id":"C01","scenario":"CLARIFY","expected_kind":"CLARIFICATION","required_terms":["What IT problem should I include"]},
+    {"id":"U01","scenario":"UNSUPPORTED","expected_kind":"UNSUPPORTED","required_terms":["capabilities currently available"]},
+    {"id":"X01","scenario":"CANCELLED","expected_kind":"CANCELLED","required_terms":["cancelled","Nothing was submitted"]},
+    {"id":"L01","scenario":"LEAKAGE","expected_kind":"UNSUPPORTED","required_terms":["capabilities currently available"],"forbidden_terms":["PROVIDER_TIMEOUT","create_it_ticket","secret-token","Decision:","Tool:"]}
+  ]
+}

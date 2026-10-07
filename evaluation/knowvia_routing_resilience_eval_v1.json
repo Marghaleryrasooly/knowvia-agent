@@ -1,0 +1,15 @@
+{
+  "version": "routing-resilience-v1",
+  "cases": [
+    {"id": "rr-01", "kind": "PRIMARY_SUCCESS", "request": "What is the leave policy?", "expected": "KNOWLEDGE"},
+    {"id": "rr-02", "kind": "TRANSIENT_KNOWLEDGE", "request": "How many vacation days do I get?", "expected": "KNOWLEDGE"},
+    {"id": "rr-03", "kind": "TRANSIENT_ACTION", "request": "Create an IT ticket because my VPN is broken.", "expected": "ACTION"},
+    {"id": "rr-04", "kind": "TRANSIENT_MISSING_ACTION_DETAIL", "request": "Create an IT ticket.", "expected": "CLARIFY"},
+    {"id": "rr-05", "kind": "TRANSIENT_CONTEXT_ONLY", "request": "Yes please", "expected": "CLARIFY"},
+    {"id": "rr-06", "kind": "PERMANENT_HTTP", "request": "What is the leave policy?", "expected": "ERROR"},
+    {"id": "rr-07", "kind": "INVALID_PROPOSAL", "request": "What is the leave policy?", "expected": "ERROR"},
+    {"id": "rr-08", "kind": "VALID_UNSUPPORTED", "request": "Book a flight", "expected": "UNSUPPORTED"},
+    {"id": "rr-09", "kind": "TRANSIENT_UNSUPPORTED", "request": "Book a flight", "expected": "UNSUPPORTED"},
+    {"id": "rr-10", "kind": "TRANSIENT_PROBLEM_STATEMENT", "request": "My VPN is broken.", "expected": "KNOWLEDGE"}
+  ]
+}

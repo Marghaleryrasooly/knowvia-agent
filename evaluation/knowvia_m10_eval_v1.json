@@ -1,0 +1,15 @@
+{
+  "name": "knowvia_m10_action_lifecycle_v1",
+  "version": "1.0.0",
+  "cases": [
+    {"id":"L01","kind":"CREATION_BINDING"},
+    {"id":"L02","kind":"OWNER_LOOKUP"},
+    {"id":"L03","kind":"CROSS_IDENTITY_DENIAL"},
+    {"id":"L04","kind":"UNKNOWN_TICKET"},
+    {"id":"L05","kind":"OPEN_TO_IN_PROGRESS"},
+    {"id":"L06","kind":"IN_PROGRESS_TO_RESOLVED"},
+    {"id":"L07","kind":"NOTIFICATION_DEDUPLICATION"},
+    {"id":"L08","kind":"MODEL_OVERRIDE_RESISTANCE"},
+    {"id":"L09","kind":"UNAUTHORIZED_CREATE"}
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "knowvia_m8_7_knowledge_normalization_v1",
+  "version": "1.0.0",
+  "cases": [
+    {"id":"N01","request":"My VPN isn't working.","expected_normalization":true,"expected_decision":"KNOWLEDGE","expected_skill":"it_support","required_terms":["documented company guidance","My VPN isn't working"],"forbidden_terms":["create a ticket","Windows","macOS"]},
+    {"id":"N02","request":"I can't access company email.","expected_normalization":true,"expected_decision":"KNOWLEDGE","expected_skill":"it_support","required_terms":["documented company guidance","I can't access company email"],"forbidden_terms":["create a ticket","password reset"]},
+    {"id":"N03","request":"My laptop won't connect to Wi-Fi.","expected_normalization":true,"expected_decision":"KNOWLEDGE","expected_skill":"it_support","required_terms":["documented company guidance","My laptop won't connect to Wi-Fi"],"forbidden_terms":["create a ticket","Windows","router model"]},
+    {"id":"N04","request":"I'm having trouble with MFA.","expected_normalization":true,"expected_decision":"KNOWLEDGE","expected_skill":"it_support","required_terms":["documented company guidance","trouble with MFA"],"forbidden_terms":["create a ticket","phone number"]},
+    {"id":"N05","request":"My VPN is giving error 809.","expected_normalization":true,"expected_decision":"KNOWLEDGE","expected_skill":"it_support","required_terms":["error 809"],"forbidden_terms":["Windows","firewall","create a ticket"]},
+    {"id":"U01","request":"How many vacation days do I get?","expected_normalization":false,"expected_decision":"KNOWLEDGE","expected_skill":"hr","required_terms":["How many vacation days do I get?"],"forbidden_terms":[]},
+    {"id":"U02","request":"What is the meal allowance?","expected_normalization":false,"expected_decision":"KNOWLEDGE","expected_skill":"finance","required_terms":["What is the meal allowance?"],"forbidden_terms":[]},
+    {"id":"A01","request":"Create an IT ticket for my VPN problem.","expected_normalization":false,"expected_decision":"ACTION","expected_skill":"it_support","required_terms":[],"forbidden_terms":[]},
+    {"id":"A02","request":"Open a support ticket because email isn't working.","expected_normalization":false,"expected_decision":"ACTION","expected_skill":"it_support","required_terms":[],"forbidden_terms":[]},
+    {"id":"X01","request":"Things are difficult today.","expected_normalization":false,"expected_decision":"UNSUPPORTED","expected_skill":null,"required_terms":[],"forbidden_terms":[]}
+  ]
+}

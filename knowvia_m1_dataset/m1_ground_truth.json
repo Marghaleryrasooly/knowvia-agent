@@ -1,0 +1,74 @@
+[
+  {
+    "question": "How many paid vacation days do full-time employees receive?",
+    "expected_doc": "01_employee_handbook.md",
+    "expected_section": "Annual Leave",
+    "expected_behavior": "retrieve"
+  },
+  {
+    "question": "Can I work from home three days every week?",
+    "expected_doc": "02_remote_work_policy.md",
+    "expected_section": "Standard Remote Work",
+    "expected_behavior": "retrieve"
+  },
+  {
+    "question": "How long must my company password be?",
+    "expected_doc": "03_it_access_security_policy.md",
+    "expected_section": "Passwords",
+    "expected_behavior": "retrieve"
+  },
+  {
+    "question": "How much professional development budget do I get?",
+    "expected_doc": "04_employee_benefits_guide.md",
+    "expected_section": "Learning Budget",
+    "expected_behavior": "retrieve"
+  },
+  {
+    "question": "What should I do if the VPN still fails after restarting it?",
+    "expected_doc": "05_it_setup_guide.md",
+    "expected_section": "VPN",
+    "expected_behavior": "retrieve"
+  },
+  {
+    "question": "Can I push directly to the main branch?",
+    "expected_doc": "06_engineering_practices.md",
+    "expected_section": "Main Branch Protection",
+    "expected_behavior": "retrieve"
+  },
+  {
+    "question": "What counts as confidential information?",
+    "expected_doc": "07_information_classification_policy.md",
+    "expected_section": "Confidential",
+    "expected_behavior": "retrieve"
+  },
+  {
+    "question": "When do I need a receipt for an expense?",
+    "expected_doc": "08_expense_policy.md",
+    "expected_section": "Receipts",
+    "expected_behavior": "retrieve"
+  },
+  {
+    "question": "Can I paste confidential source code into ChatGPT?",
+    "expected_doc": null,
+    "expected_section": null,
+    "expected_behavior": "insufficient_evidence"
+  },
+  {
+    "question": "What is the CEO's favorite restaurant?",
+    "expected_doc": null,
+    "expected_section": null,
+    "expected_behavior": "insufficient_evidence"
+  },
+  {
+    "question": "Does NovaTech provide free parking at every office?",
+    "expected_doc": null,
+    "expected_section": null,
+    "expected_behavior": "insufficient_evidence"
+  },
+  {
+    "question": "Can I use my personal laptop for production database access?",
+    "expected_doc": null,
+    "expected_section": null,
+    "expected_behavior": "insufficient_evidence"
+  }
+]

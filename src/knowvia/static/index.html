@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Knowvia enterprise knowledge and action assistant">
+  <title>Knowvia — Employee Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css?v=m15-final-polish-11">
+</head>
+<body>
+  <section class="auth-screen" id="auth-screen" aria-live="polite">
+    <div class="auth-brand"><div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div><div><strong>Knowvia</strong><small>Workplace assistant</small></div></div>
+    <div class="auth-card">
+      <div class="auth-loading" id="auth-loading"><span class="auth-spinner"></span><strong>Checking your session…</strong></div>
+      <div id="auth-content" hidden>
+        <p class="eyebrow">SECURE EMPLOYEE ACCESS</p>
+        <h1 id="auth-title">Welcome back</h1>
+        <p class="auth-intro" id="auth-intro">Sign in with your company account to continue to Knowvia.</p>
+        <div class="auth-tabs" role="tablist" aria-label="Account access">
+          <button type="button" role="tab" id="signin-tab" aria-selected="true">Sign in</button>
+          <button type="button" role="tab" id="register-tab" aria-selected="false">Create account</button>
+        </div>
+        <form class="auth-form" id="signin-form">
+          <label><span>Work email</span><input id="signin-email" type="email" autocomplete="username" required></label>
+          <label><span>Password</span><div class="password-field"><input id="signin-password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required><button type="button" data-password-toggle="signin-password" aria-label="Show password">Show</button></div></label>
+          <p class="auth-message" id="signin-message" role="status" aria-live="polite"></p>
+          <button class="auth-submit" id="signin-submit" type="submit">Sign in</button>
+        </form>
+        <form class="auth-form" id="register-form" hidden>
+          <label><span>Employee ID</span><input id="register-employee-id" autocomplete="off" maxlength="128" required></label>
+          <label><span>Work email</span><input id="register-email" type="email" autocomplete="username" required></label>
+          <label><span>Password</span><div class="password-field"><input id="register-password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required><button type="button" data-password-toggle="register-password" aria-label="Show password">Show</button></div><small>Use 12–128 characters.</small></label>
+          <label><span>Confirm password</span><div class="password-field"><input id="register-confirmation" type="password" autocomplete="new-password" minlength="12" maxlength="128" required><button type="button" data-password-toggle="register-confirmation" aria-label="Show password confirmation">Show</button></div></label>
+          <p class="auth-message" id="register-message" role="status" aria-live="polite"></p>
+          <button class="auth-submit" id="register-submit" type="submit">Create account</button>
+        </form>
+        <p class="auth-demo-guidance" id="auth-demo-guidance" hidden>Development demo: use a seeded NovaTech employee ID and its matching work email.</p>
+      </div>
+    </div>
+    <p class="auth-footnote">Trusted company knowledge and workplace support.</p>
+  </section>
+
+  <div class="shell" id="app-shell" hidden>
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div><strong>Knowvia</strong><small>Workplace assistant</small></div>
+      </div>
+      <button class="new-chat" id="new-chat"><span>＋</span> New conversation</button>
+      <nav class="chat-list" id="chat-list" aria-label="Conversations"></nav>
+      <div class="sidebar-footer"><span class="environment-dot"></span><span>NovaTech Workspace</span></div>
+    </aside>
+    <div class="sidebar-resizer" id="sidebar-resizer" role="separator" aria-label="Resize conversation sidebar" aria-orientation="vertical" tabindex="0"></div>
+
+    <main class="workspace">
+      <header class="topbar">
+        <button class="icon-button mobile-menu" id="mobile-menu" aria-label="Open conversations">☰</button>
+        <div class="page-context"><strong>Employee assistant</strong><span>Company knowledge and support</span></div>
+        <div class="top-actions">
+          <div class="notification-menu">
+            <button class="icon-button notification-button" id="notification-button" aria-label="Notifications" aria-controls="notification-panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><b id="notification-count"></b></button>
+            <span class="notification-tooltip" aria-hidden="true">Notifications</span>
+            <section class="notification-panel" id="notification-panel" aria-label="Notifications" hidden>
+              <div class="panel-heading"><strong>Notifications</strong><button id="close-notifications" type="button" aria-label="Close notifications">×</button></div>
+              <div id="notification-list" class="notification-list"></div>
+            </section>
+          </div>
+          <div class="developer-menu" id="developer-menu">
+            <button class="identity-trigger" id="developer-trigger" aria-expanded="false" aria-haspopup="true"><span class="avatar" id="avatar">DE</span><span class="identity-copy"><small>Demo identity</small><strong id="identity-name">Demo Employee</strong></span><span class="chevron">⌄</span></button>
+            <div class="developer-popover" id="developer-popover" hidden>
+              <div class="popover-heading"><strong>Demo / Developer</strong><span>Local testing controls</span></div>
+              <div class="identity-warning">Identity switching is for development demonstrations only. It is not production authentication.</div>
+              <div class="control-label">Acting as</div>
+              <div class="identity-options" id="identity-options"></div>
+              <label class="demo-toggle" id="developer-details-control"><span><strong>Developer details</strong><small>Show safe orchestration summaries</small></span><input type="checkbox" id="demo-toggle"></label>
+              <select id="identity-select" aria-label="Development identity" hidden></select>
+            </div>
+          </div>
+          <div class="profile-menu" id="profile-menu" hidden>
+            <button class="identity-trigger" id="profile-trigger" aria-expanded="false" aria-haspopup="true"><span class="avatar" id="profile-avatar"></span><span class="identity-copy"><small id="profile-department"></small><strong id="profile-name"></strong></span><span class="chevron">⌄</span></button>
+            <div class="developer-popover profile-popover" id="profile-popover" hidden>
+              <div class="profile-heading"><span class="avatar large" id="profile-popover-avatar"></span><div><strong id="profile-full-name"></strong><span id="profile-email"></span></div></div>
+              <dl class="profile-details"><div><dt>Employee ID</dt><dd id="profile-employee-id"></dd></div><div><dt>Department</dt><dd id="profile-detail-department"></dd></div><div><dt>Role</dt><dd id="profile-role"></dd></div></dl>
+              <button class="signout-button" id="signout-button">Sign out</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="chat" id="chat">
+        <div class="welcome" id="welcome">
+          <div class="welcome-mark"><div class="brand-mark large"><span></span><span></span><span></span></div></div>
+          <p class="eyebrow">KNOWVIA FOR EMPLOYEES</p>
+          <h1>How can I help?</h1>
+          <p class="welcome-copy">Find trusted company guidance, solve workplace issues, and manage IT support—all in one place.</p>
+          <div class="suggestions">
+            <button data-prompt="How many vacation days do I get?"><span class="suggestion-icon">01</span><span><strong>Company policies</strong><small>Leave, benefits and remote work</small></span><b>›</b></button>
+            <button data-prompt="My VPN isn't working. How can I fix it?"><span class="suggestion-icon">02</span><span><strong>IT support</strong><small>VPN, access and device help</small></span><b>›</b></button>
+            <button data-prompt="Can I claim a meal during a business trip?"><span class="suggestion-icon">03</span><span><strong>Expenses</strong><small>Meals, hotels and transport</small></span><b>›</b></button>
+          </div>
+        </div>
+        <div class="messages" id="messages" aria-live="polite"></div>
+      </section>
+
+      <footer class="composer-wrap">
+        <form class="composer" id="composer">
+          <textarea id="message-input" rows="1" maxlength="4000" placeholder="Ask Knowvia anything about work…" aria-label="Message"></textarea>
+          <button type="submit" class="send-button" id="send-button" aria-label="Send message">↑</button>
+        </form>
+        <p>Knowvia uses company sources and asks before performing real actions.</p>
+      </footer>
+    </main>
+  </div>
+  <dialog class="conversation-modal" id="conversation-modal" aria-labelledby="conversation-modal-title">
+    <form id="conversation-modal-form">
+      <h2 id="conversation-modal-title"></h2>
+      <div class="conversation-modal-name" id="conversation-modal-name"></div>
+      <label class="conversation-rename-field" id="conversation-rename-field" hidden>
+        <span>Conversation title</span>
+        <input id="conversation-rename-input" type="text" maxlength="80" autocomplete="off">
+      </label>
+      <p class="conversation-modal-copy" id="conversation-modal-copy"></p>
+      <p class="conversation-modal-error" id="conversation-modal-error" role="alert" hidden></p>
+      <div class="conversation-modal-actions">
+        <button type="button" class="modal-cancel" id="conversation-modal-cancel">Cancel</button>
+        <button type="submit" class="modal-submit" id="conversation-modal-submit"></button>
+      </div>
+    </form>
+  </dialog>
+  <script src="/static/app.js?v=m15-final-polish-1" defer></script>
+</body>
+</html>

@@ -1,0 +1,315 @@
+{
+  "name": "Knowvia NovaTech M4 Evaluation",
+  "version": "1.0.0",
+  "corpus": "knowvia_m1_dataset",
+  "cases": [
+    {
+      "id": "m4-001", "question": "How many paid vacation days does a full-time employee receive each year?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "01_employee_handbook.md", "section": "Annual Leave"}],
+      "reference_answer": "Full-time employees receive 24 paid vacation days per calendar year.",
+      "answer_criteria": [{"type": "number", "values": ["24"]}, {"type": "contains_any", "values": ["vacation days", "paid vacation"]}],
+      "forbidden_claims": ["unused vacation always carries over automatically"], "tags": ["direct_fact", "numeric", "entitlement"], "notes": "Annual leave entitlement with a grounded forbidden claim."
+    },
+    {
+      "id": "m4-002", "question": "My vacation request is for six consecutive workdays. Whose approval is required?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "01_employee_handbook.md", "section": "Annual Leave"}],
+      "reference_answer": "A vacation request longer than five consecutive working days requires manager approval.",
+      "answer_criteria": [{"type": "contains_all", "values": ["manager", "approval"]}],
+      "tags": ["paraphrase", "requirement", "distractor_heavy"], "notes": "Applies a stated threshold to a six-day request."
+    },
+    {
+      "id": "m4-003", "question": "Do unused vacation days automatically roll into next year?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "01_employee_handbook.md", "section": "Annual Leave"}],
+      "reference_answer": "No. Unused vacation does not automatically carry over unless HR grants an exception.",
+      "answer_criteria": [{"type": "contains_all", "values": ["not automatically", "HR", "exception"]}],
+      "tags": ["direct_prohibition", "qualification"], "notes": "Requires the explicit exception."
+    },
+    {
+      "id": "m4-004", "question": "What documentation is needed after being sick for four consecutive working days?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "01_employee_handbook.md", "section": "Sick Leave"}],
+      "reference_answer": "Medical documentation is required after more than three consecutive working days of absence.",
+      "answer_criteria": [{"type": "contains_all", "values": ["medical", "documentation"]}],
+      "tags": ["requirement", "numeric", "paraphrase"], "notes": "Applies the more-than-three-day condition."
+    },
+    {
+      "id": "m4-005", "question": "What are NovaTech's normal weekday working hours and lunch break?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "01_employee_handbook.md", "section": "Working Hours"}],
+      "reference_answer": "Normal hours are Monday through Friday, 9:00 AM to 5:00 PM, with a one-hour lunch break.",
+      "answer_criteria": [{"type": "contains_all", "values": ["Monday", "Friday", "9:00", "5:00", "one-hour"]}],
+      "tags": ["direct_fact", "multi_fact"], "notes": "Several facts from one section."
+    },
+    {
+      "id": "m4-006", "question": "How long is the usual probation period for a new full-time hire?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "01_employee_handbook.md", "section": "Probation"}],
+      "reference_answer": "The usual probation period is three months unless the employment agreement says otherwise.",
+      "answer_criteria": [{"type": "number", "values": ["three", "3"]}, {"type": "contains_any", "values": ["month", "months"]}],
+      "tags": ["duration", "qualification"], "notes": "Probation duration."
+    },
+    {
+      "id": "m4-007", "question": "What is the weekly maximum for working remotely?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "02_remote_work_policy.md", "section": "Standard Remote Work"}],
+      "reference_answer": "Employees may work remotely up to three days per week with direct-manager approval of the schedule.",
+      "answer_criteria": [{"type": "number", "values": ["three", "3"]}, {"type": "contains_any", "values": ["per week", "each week"]}],
+      "forbidden_claims": ["remote work is unlimited"], "tags": ["maximum", "permission"], "notes": "Explicit remote-work maximum."
+    },
+    {
+      "id": "m4-008", "question": "Who must approve my regular work-from-home schedule?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "02_remote_work_policy.md", "section": "Standard Remote Work"}],
+      "reference_answer": "Your direct manager must approve the remote-work schedule.",
+      "answer_criteria": [{"type": "contains_all", "values": ["direct manager", "approve"]}],
+      "tags": ["requirement", "paraphrase"], "notes": "Approval authority."
+    },
+    {
+      "id": "m4-009", "question": "I want to work from another country for 12 straight calendar days. What approval do I need?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "02_remote_work_policy.md", "section": "Working Location"}],
+      "reference_answer": "Working from another country for more than 10 consecutive calendar days requires written HR approval.",
+      "answer_criteria": [{"type": "contains_all", "values": ["written", "HR", "approval"]}],
+      "tags": ["distractor_heavy", "numeric", "requirement"], "notes": "Applies a location-duration rule."
+    },
+    {
+      "id": "m4-010", "question": "While remote, when must I be reachable and through what kind of tools?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "02_remote_work_policy.md", "section": "Availability"}],
+      "reference_answer": "Remote employees must be reachable through approved company communication tools during normal working hours.",
+      "answer_criteria": [{"type": "contains_all", "values": ["approved company communication tools", "normal working hours"]}],
+      "tags": ["requirement", "multi_fact"], "notes": "Availability rule."
+    },
+    {
+      "id": "m4-011", "question": "Which computer should I use for company work when the company has issued me one?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "02_remote_work_policy.md", "section": "Equipment"}],
+      "reference_answer": "Use the company-issued laptop for company work when it is available.",
+      "answer_criteria": [{"type": "contains_all", "values": ["company-issued", "laptop"]}],
+      "tags": ["requirement", "equipment"], "notes": "Direct equipment requirement."
+    },
+    {
+      "id": "m4-012", "question": "What is the minimum number of characters for a company password?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "03_it_access_security_policy.md", "section": "Passwords"}],
+      "reference_answer": "Company passwords must contain at least 14 characters.",
+      "answer_criteria": [{"type": "number", "values": ["14"]}, {"type": "contains_any", "values": ["at least", "minimum"]}],
+      "tags": ["minimum", "security"], "notes": "Explicit minimum."
+    },
+    {
+      "id": "m4-013", "question": "May I tell a coworker my company password?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "03_it_access_security_policy.md", "section": "Passwords"}],
+      "reference_answer": "No. Company passwords must not be shared with other employees.",
+      "answer_criteria": [{"type": "contains_all", "values": ["must not", "shared"]}],
+      "tags": ["prohibition", "permission_question"], "notes": "Directly supported prohibition."
+    },
+    {
+      "id": "m4-014", "question": "Which company accounts require multi-factor authentication?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "03_it_access_security_policy.md", "section": "Multi-Factor Authentication"}],
+      "reference_answer": "MFA is required for all company accounts that support it.",
+      "answer_criteria": [{"type": "contains_all", "values": ["all company accounts", "support"]}],
+      "tags": ["requirement", "qualification"], "notes": "MFA scope."
+    },
+    {
+      "id": "m4-015", "question": "Are shared admin accounts allowed without IT Security approval?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "03_it_access_security_policy.md", "section": "Account Access"}],
+      "reference_answer": "No. Shared administrative accounts are prohibited unless specifically approved by IT Security.",
+      "answer_criteria": [{"type": "contains_all", "values": ["prohibited", "IT Security", "approved"]}],
+      "tags": ["prohibition", "exception"], "notes": "Prohibition with approval exception."
+    },
+    {
+      "id": "m4-016", "question": "After how much inactivity must a company computer lock itself?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "03_it_access_security_policy.md", "section": "Device Lock"}],
+      "reference_answer": "A company computer must automatically lock after 10 minutes of inactivity.",
+      "answer_criteria": [{"type": "number", "values": ["10"]}, {"type": "contains_any", "values": ["minute", "minutes"]}],
+      "tags": ["numeric", "requirement"], "notes": "Automatic lock duration."
+    },
+    {
+      "id": "m4-017", "question": "What should I do immediately if my company laptop is stolen?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "03_it_access_security_policy.md", "section": "Lost Devices"}],
+      "reference_answer": "Report a lost or stolen company device to the IT Service Desk immediately.",
+      "answer_criteria": [{"type": "contains_all", "values": ["IT Service Desk", "immediately"]}],
+      "tags": ["procedure", "security"], "notes": "Single-step incident procedure."
+    },
+    {
+      "id": "m4-018", "question": "When does health insurance enrollment begin for an eligible full-time employee?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "04_employee_benefits_guide.md", "section": "Health Insurance"}],
+      "reference_answer": "Eligible full-time employees enroll after completing 30 days of employment.",
+      "answer_criteria": [{"type": "number", "values": ["30"]}, {"type": "contains_all", "values": ["full-time", "employment"]}],
+      "tags": ["eligibility", "duration"], "notes": "Benefit waiting period."
+    },
+    {
+      "id": "m4-019", "question": "How much annual wellness allowance does a full-time employee get?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "04_employee_benefits_guide.md", "section": "Wellness Allowance"}],
+      "reference_answer": "Full-time employees receive USD 500 annually for approved fitness, wellbeing, or ergonomic expenses.",
+      "answer_criteria": [{"type": "number", "values": ["500"]}, {"type": "contains_any", "values": ["wellness", "fitness", "wellbeing", "ergonomic"]}],
+      "tags": ["numeric", "entitlement"], "notes": "Wellness entitlement."
+    },
+    {
+      "id": "m4-020", "question": "What is my yearly professional development budget, and is approval needed before reimbursement?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "04_employee_benefits_guide.md", "section": "Learning Budget"}],
+      "reference_answer": "A full-time employee receives USD 1,200 per year, and manager approval is required before reimbursement.",
+      "answer_criteria": [{"type": "number", "values": ["1,200", "1200"]}, {"type": "contains_all", "values": ["manager", "approval", "before reimbursement"]}],
+      "tags": ["numeric", "entitlement", "multi_fact"], "notes": "Amount plus approval requirement."
+    },
+    {
+      "id": "m4-021", "question": "Is dental coverage part of the standard benefits package for eligible full-time staff?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "04_employee_benefits_guide.md", "section": "Dental Coverage"}],
+      "reference_answer": "Yes. Dental coverage is available to eligible full-time employees as part of the standard benefits package.",
+      "answer_criteria": [{"type": "contains_all", "values": ["dental coverage", "eligible full-time", "standard benefits"]}],
+      "tags": ["eligibility", "permission"], "notes": "Direct benefit availability."
+    },
+    {
+      "id": "m4-022", "question": "Can qualifying dependents be added to supported insurance plans?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "04_employee_benefits_guide.md", "section": "Dependents"}],
+      "reference_answer": "Eligible employees may add qualifying dependents, subject to the insurer's rules.",
+      "answer_criteria": [{"type": "contains_all", "values": ["qualifying dependents", "insurer", "rules"]}],
+      "tags": ["eligibility", "permission", "qualification"], "notes": "Permission with external-plan condition."
+    },
+    {
+      "id": "m4-023", "question": "What setup steps should a new employee perform after receiving temporary laptop credentials?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "05_it_setup_guide.md", "section": "New Laptop Setup"}],
+      "reference_answer": "Sign in with the temporary credentials, immediately change the password, and enroll in MFA.",
+      "answer_criteria": [{"type": "ordered_terms", "values": ["temporary credentials", "change", "password", "multi-factor authentication"]}],
+      "tags": ["procedure", "ordered_steps"], "notes": "Ordered onboarding procedure."
+    },
+    {
+      "id": "m4-024", "question": "The VPN still fails after I restarted the client. What remaining troubleshooting should I try?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "05_it_setup_guide.md", "section": "VPN"}],
+      "reference_answer": "Re-authenticate with MFA, restart the computer, and contact the IT Service Desk if the issue continues.",
+      "answer_criteria": [{"type": "ordered_terms", "values": ["re-authenticate", "multi-factor authentication", "restart", "computer", "IT Service Desk"]}],
+      "tags": ["procedure", "ordered_steps", "distractor_heavy"], "notes": "Starts midway through the documented sequence."
+    },
+    {
+      "id": "m4-025", "question": "When accessing internal systems away from a NovaTech office, what connection is required?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "05_it_setup_guide.md", "section": "VPN"}],
+      "reference_answer": "Employees outside a NovaTech office must use the company VPN to access internal systems.",
+      "answer_criteria": [{"type": "contains_all", "values": ["company VPN", "internal systems"]}],
+      "tags": ["requirement", "paraphrase"], "notes": "VPN usage rule."
+    },
+    {
+      "id": "m4-026", "question": "Where should I get approved software when a packaged version exists?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "05_it_setup_guide.md", "section": "Software Installation"}],
+      "reference_answer": "Install it through the company software portal when an approved package is available.",
+      "answer_criteria": [{"type": "contains_all", "values": ["company software portal", "approved package"]}],
+      "tags": ["procedure", "software"], "notes": "Software source."
+    },
+    {
+      "id": "m4-027", "question": "How many other engineers must approve a production code change before merge?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "06_engineering_practices.md", "section": "Code Review"}],
+      "reference_answer": "At least one other engineer must review and approve it before merging.",
+      "answer_criteria": [{"type": "number", "values": ["one", "1"]}, {"type": "contains_all", "values": ["review", "approve"]}],
+      "tags": ["minimum", "requirement"], "notes": "Review threshold."
+    },
+    {
+      "id": "m4-028", "question": "Can engineers push straight to main?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "06_engineering_practices.md", "section": "Main Branch Protection"}],
+      "reference_answer": "No. Direct pushes to main are prohibited; changes must use an approved pull request.",
+      "answer_criteria": [{"type": "contains_all", "values": ["prohibited", "approved pull request"]}],
+      "tags": ["prohibition", "paraphrase"], "notes": "Explicit branch protection."
+    },
+    {
+      "id": "m4-029", "question": "Should a pull request be merged while mandatory CI checks are failing?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "06_engineering_practices.md", "section": "Automated Tests"}],
+      "reference_answer": "No. Pull requests should not be merged when required CI checks are failing.",
+      "answer_criteria": [{"type": "contains_all", "values": ["should not", "merged", "CI checks", "failing"]}],
+      "tags": ["prohibition", "engineering"], "notes": "CI merge condition."
+    },
+    {
+      "id": "m4-030", "question": "What credentials are forbidden from being committed to source control?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "06_engineering_practices.md", "section": "Secrets"}],
+      "reference_answer": "API keys, passwords, access tokens, and private credentials must never be committed.",
+      "answer_criteria": [{"type": "contains_all", "values": ["API keys", "passwords", "access tokens", "private credentials"]}],
+      "tags": ["definition", "prohibition", "multi_fact"], "notes": "Complete secrets list."
+    },
+    {
+      "id": "m4-031", "question": "What must happen before a normal production deployment, and what follows an emergency change?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "06_engineering_practices.md", "section": "Production Deployments"}],
+      "reference_answer": "Mandatory CI checks must pass before production deployment, and emergency changes must be documented afterward.",
+      "answer_criteria": [{"type": "contains_all", "values": ["mandatory CI checks", "pass", "emergency", "documented"]}],
+      "tags": ["multi_fact", "procedure", "distractor_heavy"], "notes": "Two deployment rules."
+    },
+    {
+      "id": "m4-032", "question": "Give examples of information NovaTech classifies as confidential.", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "07_information_classification_policy.md", "section": "Confidential"}],
+      "reference_answer": "Examples include non-public financial information, customer data, security details, private source code, and sensitive business plans.",
+      "answer_criteria": [{"type": "contains_all", "values": ["non-public financial", "customer data", "security details", "private source code", "sensitive business plans"]}],
+      "tags": ["definition", "multi_fact"], "notes": "Complete confidential examples."
+    },
+    {
+      "id": "m4-033", "question": "Who may receive confidential company information?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "07_information_classification_policy.md", "section": "Confidential"}],
+      "reference_answer": "Only people authorized to access it who have a legitimate business need.",
+      "answer_criteria": [{"type": "contains_all", "values": ["authorized", "legitimate business need"]}],
+      "tags": ["permission", "access_control"], "notes": "Direct sharing condition."
+    },
+    {
+      "id": "m4-034", "question": "What kinds of information are Restricted, and how is access granted?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "07_information_classification_policy.md", "section": "Restricted"}],
+      "reference_answer": "Restricted information includes authentication secrets, private cryptographic keys, and highly sensitive regulated data; access must be explicitly authorized.",
+      "answer_criteria": [{"type": "contains_all", "values": ["authentication secrets", "private cryptographic keys", "regulated data", "explicitly authorized"]}],
+      "tags": ["definition", "requirement", "multi_fact"], "notes": "Restricted definition and access rule."
+    },
+    {
+      "id": "m4-035", "question": "What is the daily meal limit on approved business travel?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "08_expense_policy.md", "section": "Meals"}],
+      "reference_answer": "Reasonable meal expenses are capped at USD 60 per day unless a local policy sets another limit.",
+      "answer_criteria": [{"type": "number", "values": ["60"]}, {"type": "contains_all", "values": ["per day", "local policy"]}],
+      "tags": ["maximum", "expense", "qualification"], "notes": "Meal cap with local-policy qualifier."
+    },
+    {
+      "id": "m4-036", "question": "For a $30 taxi expense on approved business travel, is it reimbursable and is a receipt required?", "expected_behavior": "ANSWER",
+      "expected_sources": [{"source": "08_expense_policy.md", "section": "Ground Transportation"}, {"source": "08_expense_policy.md", "section": "Receipts"}],
+      "reference_answer": "A reasonable taxi expense may be reimbursed, and a receipt is required because the individual expense is at least USD 25.",
+      "answer_criteria": [{"type": "contains_all", "values": ["taxi", "reimbursed", "receipt", "required"]}],
+      "tags": ["multi_source", "numeric", "distractor_heavy"], "notes": "Combines transportation eligibility with the receipt threshold."
+    },
+    {
+      "id": "m4-037", "question": "Can I paste confidential private source code into ChatGPT?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_permission", "distractor_heavy"], "notes": "Classification does not establish service approval."
+    },
+    {
+      "id": "m4-038", "question": "Is Microsoft Copilot approved for handling NovaTech customer data?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_permission"], "notes": "No approved-service list exists."
+    },
+    {
+      "id": "m4-039", "question": "May I use my personal laptop to access the production database?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_permission", "equipment"], "notes": "Company-issued laptop preference does not decide this exact access question."
+    },
+    {
+      "id": "m4-040", "question": "Does NovaTech provide free parking at every office?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_company_fact"], "notes": "Parking is absent from the corpus."
+    },
+    {
+      "id": "m4-041", "question": "What is the CEO's favorite restaurant?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_company_fact"], "notes": "Executive preferences are absent."
+    },
+    {
+      "id": "m4-042", "question": "Can contractors receive the USD 1,200 learning budget?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_eligibility"], "notes": "The policy specifies full-time employees, not contractor eligibility."
+    },
+    {
+      "id": "m4-043", "question": "Will NovaTech reimburse my home internet bill while I work remotely?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_entitlement"], "notes": "Remote work exists, but internet reimbursement is unspecified."
+    },
+    {
+      "id": "m4-044", "question": "Can I work remotely four days a week if my manager verbally agrees?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_exception", "distractor_heavy"], "notes": "The policy gives a three-day maximum and no manager exception mechanism."
+    },
+    {
+      "id": "m4-045", "question": "Which exact public holidays will employees in Pakistan receive next year?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "missing_external_detail"], "notes": "The handbook delegates the list to local HR but does not enumerate dates."
+    },
+    {
+      "id": "m4-046", "question": "Can I skip MFA because my phone battery is dead?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_exception", "security"], "notes": "MFA is required where supported, but no dead-phone exception is specified."
+    },
+    {
+      "id": "m4-047", "question": "Which hotel price per night will NovaTech reimburse?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_numeric", "expense"], "notes": "Booking channel exists but no hotel price limit."
+    },
+    {
+      "id": "m4-048", "question": "May an engineer bypass code review during an urgent incident?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_exception", "engineering"], "notes": "Emergency deployment documentation does not create a review bypass."
+    },
+    {
+      "id": "m4-049", "question": "Does the health insurance plan cover orthodontics?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_benefit_detail"], "notes": "Coverage details are absent."
+    },
+    {
+      "id": "m4-050", "question": "What is the maximum amount I can claim for a rideshare trip?", "expected_behavior": "ABSTAIN", "expected_sources": [], "reference_answer": null, "answer_criteria": [],
+      "tags": ["abstention", "unsupported_numeric", "expense"], "notes": "Reasonable rideshare expenses are eligible, but no numeric cap is stated."
+    }
+  ]
+}

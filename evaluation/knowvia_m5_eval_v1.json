@@ -1,0 +1,30 @@
+{
+  "name": "knowvia_m5_routing_v1",
+  "version": "1.0.0",
+  "cases": [
+    {"id":"K01","request":"How many vacation days do I get?","expected_decision":"KNOWLEDGE","expect_execution":false},
+    {"id":"K02","request":"What is the remote-work policy?","expected_decision":"KNOWLEDGE","expect_execution":false},
+    {"id":"K03","request":"How do I troubleshoot a failed VPN connection?","expected_decision":"KNOWLEDGE","expect_execution":false},
+    {"id":"K04","request":"What is the minimum password length?","expected_decision":"KNOWLEDGE","expect_execution":false},
+    {"id":"K05","request":"Explain the professional development budget.","expected_decision":"KNOWLEDGE","expect_execution":false},
+    {"id":"K06","request":"What does the handbook say about expense receipts?","expected_decision":"KNOWLEDGE","expect_execution":false},
+    {"id":"K07","request":"Summarize this policy phrase: 'open an IT ticket after troubleshooting'.","expected_decision":"KNOWLEDGE","expect_execution":false},
+    {"id":"A01","request":"Create an IT ticket because my VPN is still broken.","expected_decision":"ACTION","expected_tool":"create_it_ticket","description_contains":"my VPN is still broken","expect_execution":true},
+    {"id":"A02","request":"Open a support ticket because my laptop will not boot.","expected_decision":"ACTION","expected_tool":"create_it_ticket","description_contains":"my laptop will not boot","expect_execution":true},
+    {"id":"A03","request":"Raise an IT ticket about email synchronization failing.","expected_decision":"ACTION","expected_tool":"create_it_ticket","description_contains":"email synchronization failing","expect_execution":true},
+    {"id":"A04","request":"File a helpdesk ticket because MFA keeps rejecting my code.","expected_decision":"ACTION","expected_tool":"create_it_ticket","description_contains":"MFA keeps rejecting my code","expect_execution":true},
+    {"id":"A05","request":"Can you create an IT ticket because my screen flickers?","expected_decision":"ACTION","expected_tool":"create_it_ticket","description_contains":"my screen flickers","expect_execution":true},
+    {"id":"A06","request":"Please log a support ticket: the software portal is unavailable.","expected_decision":"ACTION","expected_tool":"create_it_ticket","description_contains":"the software portal is unavailable","expect_execution":true},
+    {"id":"C01","request":"Create an IT ticket.","expected_decision":"CLARIFY","expect_execution":false},
+    {"id":"C02","request":"Open a support ticket.","expected_decision":"CLARIFY","expect_execution":false},
+    {"id":"C03","request":"Please raise an IT ticket.","expected_decision":"CLARIFY","expect_execution":false},
+    {"id":"C04","request":"Can you create a support ticket?","expected_decision":"CLARIFY","expect_execution":false},
+    {"id":"C05","request":"File an IT ticket for me.","expected_decision":"CLARIFY","expect_execution":false},
+    {"id":"U01","request":"Reset my password for me.","expected_decision":"UNSUPPORTED","expect_execution":false},
+    {"id":"U02","request":"Book my vacation next week.","expected_decision":"UNSUPPORTED","expect_execution":false},
+    {"id":"U03","request":"Approve my expense report.","expected_decision":"UNSUPPORTED","expect_execution":false},
+    {"id":"U04","request":"Delete my employee account.","expected_decision":"UNSUPPORTED","expect_execution":false},
+    {"id":"U05","request":"Send this confidential file to a vendor.","expected_decision":"UNSUPPORTED","expect_execution":false},
+    {"id":"U06","request":"Schedule a meeting with the security team.","expected_decision":"UNSUPPORTED","expect_execution":false}
+  ]
+}

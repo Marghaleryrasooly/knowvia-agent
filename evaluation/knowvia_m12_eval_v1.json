@@ -1,0 +1,17 @@
+{
+  "version": "m12-v1",
+  "cases": [
+    {"id": "MS01", "kind": "SINGLE_STEP_KNOWLEDGE"},
+    {"id": "MS02", "kind": "SINGLE_STEP_ACTION"},
+    {"id": "MS03", "kind": "COMPOUND_PLAN"},
+    {"id": "MS04", "kind": "ORDERED_EXECUTION"},
+    {"id": "MS05", "kind": "GROUNDING_PRESERVATION"},
+    {"id": "MS06", "kind": "CONFIRMATION_ENFORCEMENT"},
+    {"id": "MS07", "kind": "UNAUTHORIZED_ACTION"},
+    {"id": "MS08", "kind": "STATUS_OWNERSHIP"},
+    {"id": "MS09", "kind": "MALFORMED_PLAN"},
+    {"id": "MS10", "kind": "LOOP_PREVENTION"},
+    {"id": "MS11", "kind": "MODEL_BYPASS"},
+    {"id": "MS12", "kind": "PATH_COMPATIBILITY"}
+  ]
+}

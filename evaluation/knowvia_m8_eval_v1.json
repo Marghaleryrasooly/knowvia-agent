@@ -1,0 +1,19 @@
+{
+  "name": "knowvia_m8_skills_v1",
+  "version": "1.0.0",
+  "cases": [
+    {"id": "HR01", "request": "How many vacation days do I get?", "expected_status": "SELECTED", "expected_skill": "hr", "expected_tools": [], "expected_sources": ["01_employee_handbook.md", "02_remote_work_policy.md", "04_employee_benefits_guide.md"]},
+    {"id": "HR02", "request": "What health insurance benefits are available?", "expected_status": "SELECTED", "expected_skill": "hr", "expected_tools": [], "expected_sources": ["01_employee_handbook.md", "02_remote_work_policy.md", "04_employee_benefits_guide.md"]},
+    {"id": "HR03", "request": "How often may I work from home?", "expected_status": "SELECTED", "expected_skill": "hr", "expected_tools": [], "expected_sources": ["01_employee_handbook.md", "02_remote_work_policy.md", "04_employee_benefits_guide.md"]},
+    {"id": "IT01", "request": "My VPN is broken.", "expected_status": "SELECTED", "expected_skill": "it_support", "expected_tools": ["create_it_ticket"], "expected_sources": ["03_it_access_security_policy.md", "05_it_setup_guide.md", "06_engineering_practices.md", "07_information_classification_policy.md"]},
+    {"id": "IT02", "request": "What is the minimum password length?", "expected_status": "SELECTED", "expected_skill": "it_support", "expected_tools": ["create_it_ticket"], "expected_sources": ["03_it_access_security_policy.md", "05_it_setup_guide.md", "06_engineering_practices.md", "07_information_classification_policy.md"]},
+    {"id": "IT03", "request": "Create an IT ticket because my VPN is broken.", "expected_status": "SELECTED", "expected_skill": "it_support", "expected_tools": ["create_it_ticket"], "expected_sources": ["03_it_access_security_policy.md", "05_it_setup_guide.md", "06_engineering_practices.md", "07_information_classification_policy.md"], "expect_confirmation": true},
+    {"id": "IT04", "request": "Are direct pushes to the main branch prohibited?", "expected_status": "SELECTED", "expected_skill": "it_support", "expected_tools": ["create_it_ticket"], "expected_sources": ["03_it_access_security_policy.md", "05_it_setup_guide.md", "06_engineering_practices.md", "07_information_classification_policy.md"]},
+    {"id": "FN01", "request": "Can I claim a meal during a business trip?", "expected_status": "SELECTED", "expected_skill": "finance", "expected_tools": [], "expected_sources": ["08_expense_policy.md"]},
+    {"id": "FN02", "request": "Do I need a receipt for this expense?", "expected_status": "SELECTED", "expected_skill": "finance", "expected_tools": [], "expected_sources": ["08_expense_policy.md"]},
+    {"id": "FN03", "request": "What is the hotel reimbursement policy?", "expected_status": "SELECTED", "expected_skill": "finance", "expected_tools": [], "expected_sources": ["08_expense_policy.md"]},
+    {"id": "AM01", "request": "What are the vacation and meal rules?", "expected_status": "AMBIGUOUS", "expected_skill": null, "expected_tools": [], "expected_sources": []},
+    {"id": "UN01", "request": "Write a marketing campaign for me.", "expected_status": "UNSUPPORTED", "expected_skill": null, "expected_tools": [], "expected_sources": []},
+    {"id": "UK01", "request": "Use a nonexistent skill.", "expected_status": "UNKNOWN_SKILL", "expected_skill": null, "expected_tools": [], "expected_sources": [], "force_unknown_skill": true}
+  ]
+}

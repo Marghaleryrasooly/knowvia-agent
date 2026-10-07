@@ -1,0 +1,11 @@
+# Direct production dependency lock for Python 3.12.
+# Transitive Linux wheels are resolved by pip for the target platform.
+argon2-cffi==25.1.0
+google-genai==2.19.0
+mcp==2.1.1
+numpy==2.5.2
+python-dotenv==1.2.2
+onnxruntime==1.30.0
+tokenizers==0.22.2
+starlette==1.6.0
+uvicorn==0.52.4
