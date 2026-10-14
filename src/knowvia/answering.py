@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Protocol
+import re
 
 from knowvia.evidence import EvidenceEvaluator, evaluate_evidence_safely
 from knowvia.generation import GenerationProvider
@@ -98,7 +99,31 @@ class AnsweringService:
         ]
         sources = citations_from_results(supporting_results)
         user_prompt = build_grounded_user_prompt(question, supporting_results)
+        if decision.answer_scope.value == "GENERAL" and decision.conditions:
+            user_prompt += "\nPreserve these documented procedural conditions: " + "; ".join(decision.conditions)
+        if decision.answer_scope.value != "GENERAL":
+            user_prompt += (
+                f"\nAnswer scope: {decision.answer_scope.value}.\n"
+                f"Personal eligibility: {decision.personal_eligibility}.\n"
+                "Report only the documented rule with ALL conditions. Do not state or imply "
+                "that the employee personally qualifies when eligibility is UNKNOWN.\n"
+                + "Conditions to preserve: " + "; ".join(decision.conditions)
+            )
         answer = self.generator.generate(GROUNDING_SYSTEM_PROMPT, user_prompt)
+        if decision.answer_scope.value == "POLICY_REPORTING" or (decision.answer_scope.value == "GENERAL" and decision.conditions):
+            # Verbatim preservation remains the zero-call fast path. A different
+            # wording is not proof of omission: check meaning once, fail closed.
+            words = lambda text: " ".join(re.findall(r"\w+", text.casefold()))
+            verbatim_support = any(
+                words(answer) == words(text)
+                for result in supporting_results
+                for text in [result.chunk.text, *re.split(r'(?<=[.!?])\s+|\n{2,}', result.chunk.text)]
+            )
+            if not verbatim_support or any(words(condition) not in words(answer) for condition in decision.conditions):
+                validator = getattr(self.evidence_evaluator, 'validate_conditions', None)
+                if not callable(validator):
+                    raise ValueError("Grounded policy answer omitted a validated condition")
+                validator(question, answer, decision.conditions, supporting_results)
         return AnswerResult(
             answer=answer,
             sources=sources,

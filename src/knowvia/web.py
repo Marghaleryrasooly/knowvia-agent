@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import json
 import re
 from threading import Lock
 from dataclasses import dataclass
@@ -58,6 +59,9 @@ from knowvia.skills import DeterministicSkillSelector, create_default_skill_regi
 from knowvia.ticket_lifecycle import SqliteTicketLifecycleStore, StoredTicketStatusProvider, TicketLifecycleService
 from knowvia.vector_store import JsonVectorStore
 from knowvia.runtime_paths import RuntimePaths
+from knowvia.admin import AdministrationError, LoginAbuseGuard, SqliteAuthority
+from knowvia.knowledge_management import KnowledgeManagement, SnapshotSourcePolicy, EmptyKnowledgeRetriever
+from knowvia.employee_directory import EmployeeRecord
 
 
 STATIC_ROOT = Path(__file__).with_name("static")
@@ -130,7 +134,7 @@ class RuntimeFactory(Protocol):
 class ProductionRuntimeFactory:
     """Build request-scoped safety boundaries around shared retrieval components."""
 
-    def __init__(self, deployment: DeploymentConfig | None = None, paths: RuntimePaths | None = None) -> None:
+    def __init__(self, deployment: DeploymentConfig | None = None, paths: RuntimePaths | None = None, knowledge_manager=None, embedder_factory=None) -> None:
         self.deployment = deployment or DeploymentConfig.from_environment()
         self.paths = paths or RuntimePaths.from_environment()
         self.embedding_provider = self.deployment.embedding_provider
@@ -140,6 +144,8 @@ class ProductionRuntimeFactory:
         self.router_provider = self.deployment.router_provider
         self._knowledge_lock = Lock()
         self._knowledge_components = None
+        self.knowledge_manager = knowledge_manager
+        self.embedder_factory = embedder_factory or (lambda: create_embedder(self.embedding_provider))
 
     def _load_knowledge_components(self):
         if self._knowledge_components is None:
@@ -147,7 +153,7 @@ class ProductionRuntimeFactory:
                 if self._knowledge_components is None:
                     self._knowledge_components = (
                         Retriever(
-                            create_embedder(self.embedding_provider),
+                            self.embedder_factory(),
                             JsonVectorStore(self.paths.index),
                         ),
                         create_generator(self.generation_provider),
@@ -157,6 +163,13 @@ class ProductionRuntimeFactory:
 
     def build(self, identity: IdentityContext) -> RuntimeBundle:
         retriever, generator, evidence = self._load_knowledge_components()
+        snapshot, allowed_sources = (self.knowledge_manager.request_snapshot(identity)
+                                     if self.knowledge_manager is not None else (None, ()))
+        registry = snapshot.registry() if snapshot else create_default_skill_registry()
+        if snapshot:
+            # A request keeps its immutable index and ACL snapshot even while an
+            # administrator publishes or rolls back a newer version.
+            retriever = Retriever(retriever.embedder, JsonVectorStore(snapshot.index))
         mcp_transport = _mcp_transport(identity) if self.tool_provider == "mcp" else None
         tool = DemoITTicketTool() if self.deployment.public_demo else create_agent_tool(self.tool_provider, identity, mcp_transport)
         if not tool.specification.requires_confirmation:
@@ -183,8 +196,9 @@ class ProductionRuntimeFactory:
             raise ValueError("Unsupported router configuration")
 
         def knowledge_factory(skill):
+            sources = tuple(s for s in skill.knowledge_sources if s in allowed_sources) if snapshot else skill.knowledge_sources
             return AnsweringService(
-                SourceScopedRetriever(retriever, skill.knowledge_sources),
+                SourceScopedRetriever(retriever, sources) if sources else EmptyKnowledgeRetriever(),
                 generator,
                 evidence,
             )
@@ -196,7 +210,7 @@ class ProductionRuntimeFactory:
             AllowRegisteredActionAuthorizer({tool.specification.name}),
         )
         skill_agent = SkillAwareAgent(
-            create_default_skill_registry(),
+            registry,
             DeterministicSkillSelector(),
             router_factory,
             knowledge_factory,
@@ -204,6 +218,7 @@ class ProductionRuntimeFactory:
             pending,
             audit_sink=audit,
             ticket_lifecycle_service=lifecycle,
+            knowledge_source_policy=SnapshotSourcePolicy(allowed_sources) if snapshot else None,
         )
         confirmation_agent = AgentOrchestrator(
             DeterministicAgentRouter(),
@@ -678,6 +693,8 @@ def create_web_app(
     authentication_config: WebAuthenticationConfig | None = None,
     deployment_config: DeploymentConfig | None = None,
     runtime_paths: RuntimePaths | None = None,
+    admin_authority: SqliteAuthority | None = None,
+    knowledge_manager: KnowledgeManagement | None = None,
 ) -> Starlette:
     load_dotenv()
     deployment = deployment_config or DeploymentConfig.from_environment()
@@ -685,6 +702,32 @@ def create_web_app(
     paths.ensure_writable()
     service_holder = {"value": service}
     auth_holder = {"value": authentication_runtime}
+    authority_holder = {"value": admin_authority}
+    knowledge_holder = {"value": knowledge_manager}
+    embedding_holder = {"value": None}
+    embedding_lock = Lock()
+    login_guard = LoginAbuseGuard()
+
+    def current_authority():
+        if authority_holder["value"] is None:
+            authority = SqliteAuthority(paths)
+            if deployment.seed_demo_employee_directory:
+                authority.seed_demo_once()
+            authority_holder["value"] = authority
+        return authority_holder["value"]
+
+    def current_knowledge():
+        if knowledge_holder["value"] is None:
+            knowledge_holder["value"] = KnowledgeManagement(current_authority(), current_embedder)
+        return knowledge_holder["value"]
+
+    def current_embedder():
+        # Administrative indexing and query retrieval share the configured
+        # embedding runtime instead of loading a second resident model.
+        with embedding_lock:
+            if embedding_holder["value"] is None:
+                embedding_holder["value"] = create_embedder(deployment.embedding_provider)
+        return embedding_holder["value"]
     auth_config = authentication_config or WebAuthenticationConfig(
         secure_cookie=deployment.secure_cookie,
         allow_development_identity_override=deployment.development_identity_override,
@@ -698,7 +741,8 @@ def create_web_app(
     def current_service() -> KnowviaWebService:
         if service_holder["value"] is None:
             service_holder["value"] = KnowviaWebService(
-                ProductionRuntimeFactory(deployment, paths),
+                ProductionRuntimeFactory(deployment, paths, current_knowledge(), current_embedder),
+                identity_provider=current_authority(),
                 conversation_store=SqliteConversationStore(paths.conversations),
                 proposal_store=_action_services(paths)[0],
             )
@@ -707,9 +751,7 @@ def create_web_app(
     def current_authentication() -> AuthenticationRuntime:
         if auth_holder["value"] is None:
             directory = SqliteEmployeeDirectory(paths.employee_directory)
-            if deployment.seed_demo_employee_directory:
-                seed_demo_employee_directory(directory)
-            identity_provider = LocalIdentityProvider()
+            identity_provider = current_authority()
             bridge = EmployeeDirectoryIdentityService(directory, identity_provider)
             accounts = SqliteAccountRepository(paths.accounts)
             registration = RegistrationService(bridge, accounts)
@@ -752,6 +794,10 @@ def create_web_app(
     async def homepage(request: Request):
         return FileResponse(STATIC_ROOT / "index.html")
 
+    async def admin_homepage(request: Request):
+        # Public shell contains no administrative data; API authorization remains authoritative.
+        return FileResponse(STATIC_ROOT / "admin.html", headers={"Cache-Control": "no-store"})
+
     async def config(request: Request):
         return JSONResponse({
             "identities": current_service().identities() if auth_config.allow_development_identity_override else [],
@@ -786,6 +832,8 @@ def create_web_app(
             body = await request.json()
             if set(body) != {"work_email", "password"}:
                 raise AuthenticationError("Authentication failed")
+            if not login_guard.allow(request.client.host if request.client else "unknown", body["work_email"]):
+                return JSONResponse({"error": "Authentication temporarily unavailable."}, status_code=429)
             result = await run_in_threadpool(
                 current_authentication().authentication.login,
                 LoginRequest(body["work_email"], body["password"]),
@@ -830,6 +878,94 @@ def create_web_app(
             return JSONResponse({"employee": principal_payload(principal)})
         except Exception:
             return JSONResponse({"error": "Authentication required."}, status_code=401)
+
+    async def admin_endpoint(request: Request):
+        # No development override: administration always requires a real session.
+        try:
+            token = request.cookies.get(auth_config.cookie_name)
+            if token is None: raise AuthenticationError("Authentication required")
+            principal = await run_in_threadpool(current_authentication().authentication.resolve_principal, token)
+        except Exception:
+            return JSONResponse({"error": "Authentication required."}, status_code=401)
+        authority = current_authority()
+        actor = principal.identity.subject_id
+        try:
+            permission = "admin.audit.read" if request.url.path.endswith("/audit") else "admin.accounts.manage"
+            if request.url.path.endswith("/roles"): permission = "admin.roles.manage"
+            if request.url.path.startswith("/api/admin/knowledge"): permission = "admin.knowledge.manage"
+            with authority.transaction() as db:
+                authority._require(db, actor, permission)
+        except (IdentityError, AdministrationError):
+            return JSONResponse({"error": "Administrator permission required."}, status_code=403)
+        if request.method == "GET":
+            try:
+                if request.url.path == "/api/admin/knowledge":
+                    data = await run_in_threadpool(current_knowledge().listing, actor)
+                elif request.url.path.endswith("/audit"):
+                    data = {"events": await run_in_threadpool(authority.events, actor)}
+                elif request.url.path.endswith("/accounts"):
+                    data = {"accounts": await run_in_threadpool(authority.account_listing, actor)}
+                elif request.url.path.endswith("/roles"):
+                    data = {"roles": await run_in_threadpool(authority.role_catalog, actor)}
+                else:
+                    data = {"administrator": True, "employee_id": actor}
+            except (IdentityError, AdministrationError):
+                return JSONResponse({"error": "Administrator permission required."}, status_code=403, headers={"Cache-Control": "no-store"})
+            except Exception:
+                return JSONResponse({"error": "Administrative data is temporarily unavailable."}, status_code=503, headers={"Cache-Control": "no-store"})
+            return JSONResponse(data, headers={"Cache-Control": "no-store"})
+        # Strict same-origin mutations; Host is separately allowlisted by middleware.
+        from urllib.parse import urlsplit
+        origin = request.headers.get("origin", "")
+        try:
+            parsed = urlsplit(origin)
+        except ValueError:
+            return JSONResponse({"error": "Administrative request origin rejected."}, status_code=403)
+        if (parsed.scheme != request.url.scheme or parsed.netloc != request.url.netloc
+                or parsed.path or parsed.query or parsed.fragment
+                or request.headers.get("content-type", "").split(";")[0].strip() != "application/json"):
+            return JSONResponse({"error": "Administrative request origin rejected."}, status_code=403)
+        try:
+            if request.url.path.startswith("/api/admin/knowledge/"):
+                # Bound the body before decoding; Markdown is data, never HTML.
+                payload = bytearray()
+                async for part in request.stream():
+                    payload.extend(part)
+                    if len(payload) > 800_000:
+                        raise AdministrationError("Administrative upload too large")
+                body = json.loads(payload)
+                if not isinstance(body, dict): raise AdministrationError("Invalid request")
+                operation = request.url.path.rsplit("/", 1)[1]
+                manager = current_knowledge()
+                if operation == "stage":
+                    if set(body) != {"name", "content", "skill", "roles", "revision"}: raise AdministrationError("Invalid request")
+                    await run_in_threadpool(manager.stage, actor, body["name"], body["content"], body["skill"], body["roles"], body["revision"])
+                elif operation == "remove":
+                    if set(body) != {"name", "revision"}: raise AdministrationError("Invalid request")
+                    await run_in_threadpool(manager.remove, actor, body["name"], body["revision"])
+                elif operation in {"publish", "rollback", "discard"}:
+                    if set(body) != {"revision"}: raise AdministrationError("Invalid request")
+                    await run_in_threadpool(getattr(manager, operation), actor, body["revision"])
+                else:
+                    raise AdministrationError("Invalid operation")
+            else:
+                body = await request.json()
+            if request.url.path.startswith("/api/admin/knowledge/"):
+                pass
+            elif request.url.path.endswith("/activation"):
+                if set(body) != {"active"}: raise AdministrationError("Invalid request")
+                await run_in_threadpool(authority.set_active, actor, request.path_params["employee_id"], body["active"])
+            elif request.url.path.endswith("/roles"):
+                if set(body) != {"roles"}: raise AdministrationError("Invalid request")
+                await run_in_threadpool(authority.assign_roles, actor, request.path_params["employee_id"], body["roles"])
+            else:
+                fields = {"employee_id", "first_name", "last_name", "work_email", "department", "role", "password", "password_confirmation", "roles"}
+                if set(body) != fields: raise AdministrationError("Invalid request")
+                employee = EmployeeRecord(*(body[k] for k in ("employee_id", "first_name", "last_name", "work_email", "department", "role")))
+                await run_in_threadpool(authority.provision, actor, employee, body["password"], body["password_confirmation"], body["roles"])
+            return JSONResponse({"updated": True})
+        except Exception:
+            return JSONResponse({"error": "Administrative change could not be completed."}, status_code=400)
 
     async def chat(request: Request):
         active_service = None
@@ -1058,12 +1194,21 @@ def create_web_app(
         ],
         routes=[
             Route("/", homepage),
+            Route("/admin", admin_homepage),
             Route("/health", health),
             Route("/api/config", config),
             Route("/api/auth/register", register, methods=["POST"]),
             Route("/api/auth/login", login, methods=["POST"]),
             Route("/api/auth/logout", logout, methods=["POST"]),
             Route("/api/auth/me", me),
+            Route("/api/admin/me", admin_endpoint),
+            Route("/api/admin/audit", admin_endpoint),
+            Route("/api/admin/accounts", admin_endpoint, methods=["GET", "POST"]),
+            Route("/api/admin/roles", admin_endpoint),
+            Route("/api/admin/accounts/{employee_id:str}/activation", admin_endpoint, methods=["POST"]),
+            Route("/api/admin/accounts/{employee_id:str}/roles", admin_endpoint, methods=["POST"]),
+            Route("/api/admin/knowledge", admin_endpoint),
+            Route("/api/admin/knowledge/{operation:str}", admin_endpoint, methods=["POST"]),
             Route("/api/chat", chat, methods=["POST"]),
             Route("/api/conversations", conversations),
             Route(

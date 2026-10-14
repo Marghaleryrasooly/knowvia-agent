@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Knowvia secure administration">
+  <title>Knowvia — Administration</title>
+  <link rel="stylesheet" href="/static/admin.css?v=2">
+  <script src="/static/admin.js?v=2" defer></script>
+</head>
+<body>
+  <header class="header"><a class="brand" href="/admin">Knowvia <span>Administration</span></a><nav aria-label="Workspace navigation"><a href="/">Employee workspace</a><button id="logout" hidden>Sign out</button></nav></header>
+  <main>
+    <p id="notice" role="status" aria-live="polite">Checking your session…</p>
+    <section id="login-section" class="panel login" hidden>
+      <p class="eyebrow">SECURE ADMINISTRATOR ACCESS</p><h1>Sign in to administration</h1>
+      <p>Use your existing administrator account. Administrator access is provisioned privately, not through public registration.</p>
+      <form id="login-form"><label>Work email<input name="work_email" type="email" autocomplete="username" maxlength="254" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button class="primary" type="submit">Sign in</button></form>
+    </section>
+    <div id="dashboard" hidden>
+      <div class="heading"><div><p class="eyebrow">NOVATECH WORKSPACE</p><h1>Account administration</h1><p id="administrator"></p></div><button id="refresh">Refresh accounts and activity</button></div>
+      <nav class="sections" aria-label="Administration sections"><a href="#accounts-section">Employee accounts</a><a href="#provision-section">Provision employee</a><a href="#knowledge-section">Company knowledge</a><a href="#activity-section">Administrative activity</a></nav>
+      <section id="accounts-section"><h2>Employee accounts</h2><p class="muted">Job titles are display information. Access comes only from the trusted roles below.</p><div id="accounts" class="accounts"></div></section>
+      <section id="provision-section" class="panel"><h2>Provision an employee</h2><p class="muted">Create a new directory record and account together. Existing directory-only employees use the existing employee registration flow; they are not overwritten here.</p>
+        <form id="provision-form" class="provision">
+          <label>Employee ID<input name="employee_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" required></label>
+          <label>Work email<input name="work_email" type="email" maxlength="254" autocomplete="off" required></label>
+          <label>First name<input name="first_name" maxlength="120" required></label><label>Last name<input name="last_name" maxlength="120" required></label>
+          <label>Department<input name="department" maxlength="120" required></label><label>Job title (not permissions)<input name="role" maxlength="120" required></label>
+          <label>Initial password<input name="password" type="password" autocomplete="new-password" required></label><label>Confirm initial password<input name="password_confirmation" type="password" autocomplete="new-password" required></label>
+          <fieldset class="wide"><legend>Trusted access roles</legend><div id="provision-roles" class="roles"></div></fieldset>
+          <div class="wide"><button class="primary" type="submit">Create employee account</button></div>
+        </form>
+      </section>
+      <section id="knowledge-section" class="panel"><h2>Company knowledge</h2>
+        <p class="muted">Markdown changes are staged, not immediately visible to employees. Each document requires explicit reading roles and a domain permission. Publishing builds and validates a complete runtime index; reference resources are never overwritten.</p>
+        <p id="knowledge-status" aria-live="polite"></p><div id="documents" class="accounts"></div>
+        <form id="knowledge-form" class="provision">
+          <label>Markdown file (upload or replace)<input id="knowledge-file" type="file" accept=".md,text/markdown" required></label>
+          <label>Knowledge domain<select id="knowledge-skill"><option value="hr">Human resources</option><option value="it_support">IT support</option><option value="finance">Finance</option></select></label>
+          <fieldset class="wide"><legend>Explicit document reading roles</legend><div id="knowledge-roles" class="roles"></div></fieldset>
+          <div class="wide"><button type="submit">Stage document</button></div>
+        </form>
+        <div class="account-actions knowledge-actions"><button id="knowledge-publish" class="primary">Publish validated index</button><button id="knowledge-discard">Discard staged changes</button><button id="knowledge-rollback">Roll back previous version</button></div>
+      </section>
+      <section id="activity-section" class="panel"><h2>Administrative activity</h2><p class="muted">Latest 100 sanitized administrative changes. This does not expose conversations, session tokens or unrestricted application logs.</p><ol id="activity" class="activity"></ol></section>
+    </div>
+  </main>
+</body>
+</html>

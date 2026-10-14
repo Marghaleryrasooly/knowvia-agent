@@ -46,6 +46,9 @@ class RuntimePaths:
     def accounts(self) -> Path: return self.data_dir / "accounts.db"
 
     @property
+    def authority(self) -> Path: return self.data_dir / "authority.db"
+
+    @property
     def authenticated_sessions(self) -> Path: return self.data_dir / "authenticated_sessions.db"
 
     def ensure_writable(self) -> None:

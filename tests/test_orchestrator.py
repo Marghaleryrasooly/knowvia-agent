@@ -80,7 +80,7 @@ def test_router_cannot_turn_problem_statement_into_action(utterance) -> None:
     assert len(knowledge.calls) == 1
     assert utterance in knowledge.calls[0][0]
     assert knowledge.calls[0][0].startswith(
-        "What documented company guidance or troubleshooting applies"
+        "What documented company guidance directly addresses this reported problem: "
     )
     assert tool.calls == []
     assert result.tool_executed is False

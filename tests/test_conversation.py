@@ -6,6 +6,7 @@ import pytest
 
 from knowvia.agent_models import AgentDecision, AgentDecisionKind, AgentResult
 from knowvia.conversation import (
+    ConversationState,
     ConversationCoordinator,
     ConversationTurn,
     FollowUpResolver,
@@ -26,6 +27,41 @@ class Clock:
 
     def advance(self, seconds: int) -> None:
         self.value += timedelta(seconds=seconds)
+
+
+@pytest.mark.parametrize("question", [
+    "How does NovaTech determine which public non-working dates it observes?",
+    "How does Atlas decide which equipment it supports?",
+    "How does the organization decide which standards it follows?",
+])
+def test_same_question_subject_does_not_require_history(question):
+    registry = create_default_skill_registry()
+    resolver = FollowUpResolver(DeterministicSkillSelector())
+    for turns in [(), (ConversationTurn("My VPN failed", "My VPN failed", "it_support",
+                                      "KNOWLEDGE", datetime.now(timezone.utc)),)]:
+        result = resolver.resolve(question, ConversationState("local-subject", turns), registry.discover())
+        assert result.standalone_request == question
+        assert result.status.value == "READY"
+        assert result.inherited_skill_id is None
+
+
+def test_local_subject_does_not_hide_a_separate_unresolved_reference():
+    registry = create_default_skill_registry()
+    result = FollowUpResolver(DeterministicSkillSelector()).resolve(
+        "How does Atlas decide which standards it follows after that?",
+        ConversationState("no-history"), registry.discover(),
+    )
+    assert result.status.value == "CLARIFY"
+
+
+def test_explicit_embedded_subject_reaches_agent_without_stale_topic(tmp_path):
+    coordinator, agent, _, _ = make_coordinator(tmp_path)
+    coordinator.handle("embedded-subject", "My VPN isn't working.")
+    question = "How does NovaTech determine which public non-working dates it observes?"
+    result = coordinator.handle("embedded-subject", question)
+    assert result.response.kind is not EmployeeResponseKind.CLARIFICATION
+    assert agent.calls[-1][0] == question
+    assert agent.calls[-1][2] is None
 
 
 class RecordingKnowledgeAgent:

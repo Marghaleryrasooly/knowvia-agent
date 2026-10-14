@@ -80,3 +80,4 @@ class AgentResult:
     normalized_knowledge_request: NormalizedKnowledgeRequest | None = None
     permission_denied: bool = False
     ticket_status_result: "TicketStatusResult | None" = None
+    confirmation_failed: bool = False

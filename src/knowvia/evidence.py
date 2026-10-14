@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from knowvia.generation import GenerationProvider
-from knowvia.models import EvidenceDecision, EvidenceStatus, RetrievalResult
+from knowvia.models import EvidenceAnswerScope, EvidenceDecision, EvidenceStatus, RetrievalResult
+from knowvia.evidence_scope_intent import question_scope_constraint, scope_constraint_instruction
 
 # Native decoder constraints supplement, never replace, the semantic validator.
 EVIDENCE_RESPONSE_SCHEMA = {
@@ -21,6 +22,19 @@ EVIDENCE_RESPONSE_SCHEMA = {
         "decision": {"type": "string", "enum": ["SUFFICIENT", "INSUFFICIENT"]},
     },
 }
+
+_ANSWERABILITY_CONTRACT = """PROBLEM RELEVANCE AND CONDITIONAL POLICY rules:
+- For a reported problem, keep the employee's original problem as the answerability target, even when it is framed as an informational question. Restate that problem in requested_claim; do not substitute a broader request for related guidance.
+- A fact must establish an answer to that problem, not merely concern the same topic. Usage restrictions, prerequisites, and neighboring procedures do not establish how to resolve a different failure.
+- A troubleshooting procedure supports only the failure it documents. Do not assume an unstated cause or triggering condition in order to apply it to another problem. Documented reporting or escalation requirements can answer what to do when they directly cover the reported event.
+- Distinguish reporting a conditional policy from verifying personal eligibility. An ordinary question about an allowance or rule can be answered by reporting the documented rule with all its conditions, without claiming the employee personally satisfies them. Preserve those conditions in directly_supported_facts.
+- If the question specifically asks whether the employee qualifies, meets a condition, or belongs to an eligible group, that material fact must be established. Do not infer eligibility or ineligibility for an undocumented group. Unknown eligibility does not justify stripping conditions from a reported policy, and reporting a conditional policy does not verify personal eligibility.
+- When only related facts exist, return INSUFFICIENT with the missing answer or applicability fact. Never turn a valid-looking selection of related sources into proof of answerability.
+
+Paired example: Evidence: Overnight-duty staff may claim meals.
+"What meals can I claim?" => SUFFICIENT to report that conditional rule, not personal eligibility.
+"Am I eligible?" => INSUFFICIENT if overnight-duty status is unknown; that status is the missing fact.
+"""
 
 EVIDENCE_SYSTEM_PROMPT = """You are a strict evidence-sufficiency classifier for company-policy questions.
 Decide whether the supplied evidence DIRECTLY SUPPORTS the employee's exact requested claim.
@@ -61,25 +75,7 @@ UNSUPPORTED INFERENCE rules:
 - Do not infer an unstated numeric limit, company fact, benefit detail, approval status, or exclusion.
 - Do not use general knowledge, common practice, safety advice, or what a policy ought to say.
 
-Small generic examples:
-
-Question: What is the weekly maximum for remote work?
-Evidence: Staff may work remotely up to two days per week.
-Output: {"requested_claim":"The maximum remote-work allowance per week.","directly_supported_facts":["Staff may work remotely up to two days per week."],"supporting_evidence_ids":[1],"missing_fact":"","decision":"SUFFICIENT"}
-
-Question: May I upload directly to the protected branch?
-Evidence: Direct uploads to the protected branch are prohibited.
-Output: {"requested_claim":"Whether direct uploads to the protected branch are allowed.","directly_supported_facts":["Direct uploads to the protected branch are prohibited."],"supporting_evidence_ids":[1],"missing_fact":"","decision":"SUFFICIENT"}
-
-Question: Do contractors receive the travel allowance?
-Evidence: Permanent employees receive the travel allowance.
-Output: {"requested_claim":"Whether contractors receive the travel allowance.","directly_supported_facts":["Permanent employees receive the travel allowance."],"supporting_evidence_ids":[],"missing_fact":"Whether contractors are eligible for the travel allowance.","decision":"INSUFFICIENT"}
-
-Question: May confidential records be entered into Service Z?
-Evidence: Confidential records may be shared only with authorized recipients.
-Output: {"requested_claim":"Whether Service Z is approved for confidential records.","directly_supported_facts":["Confidential records may be shared only with authorized recipients."],"supporting_evidence_ids":[],"missing_fact":"Whether Service Z is an approved or authorized service for confidential records.","decision":"INSUFFICIENT"}
-
-Return exactly one JSON object with exactly these keys and types:
+Return one JSON object containing these base fields AND the four answer-scope fields below:
 {"requested_claim":"non-empty string","directly_supported_facts":["one or more non-empty strings"],"supporting_evidence_ids":[1],"missing_fact":"string","decision":"SUFFICIENT or INSUFFICIENT"}
 Evidence IDs are the one-based numbers in [Evidence N]. Select only evidence that directly supports the requested claim; do not select merely related or distracting evidence.
 For SUFFICIENT, directly_supported_facts and supporting_evidence_ids must be non-empty and missing_fact must be empty.
@@ -88,13 +84,13 @@ Before returning, silently verify all three consistency checks:
 1. SUFFICIENT => one or more minimal supporting IDs AND an empty missing_fact.
 2. INSUFFICIENT => zero supporting IDs AND a specific non-empty missing_fact.
 3. Every selected ID is necessary for at least one listed directly supported fact.
-Do not use Markdown fences. Do not include text before or after the JSON."""
+Do not use Markdown fences. Do not include text before or after the JSON.""" + "\n\n" + _ANSWERABILITY_CONTRACT
 
 EVIDENCE_REPAIR_SYSTEM_PROMPT = """You are the final consistency validator for a company-evidence decision.
 Re-evaluate the employee question against only the supplied company evidence. The earlier
 decision was rejected as structurally contradictory or malformed; do not copy its decision.
 
-Return exactly one strict JSON object with exactly these keys:
+Return one strict JSON object with these base fields AND the four answer-scope fields below:
 {"requested_claim":"non-empty string","directly_supported_facts":["non-empty strings"],"supporting_evidence_ids":[1],"missing_fact":"string","decision":"SUFFICIENT or INSUFFICIENT"}
 
 Choose SUFFICIENT only when the evidence directly establishes the requested claim. Then
@@ -113,11 +109,76 @@ Apply these general direct-support rules:
 - Do not demand unrelated details or every imaginable exception once the exact requested claim
   and its stated conditions are established.
 
-Do not use Markdown or any surrounding text."""
+Do not use Markdown or any surrounding text.""" + "\n\n" + _ANSWERABILITY_CONTRACT
+
+# Versioned extension: original five-field records remain readable as GENERAL
+# for reference fixtures. New model responses must express scope explicitly.
+_SCOPE_CONTRACT = """
+ANSWER SCOPE CONTRACT (requires answer_scope; policy-specific fields depend on scope):
+answer_scope: GENERAL, POLICY_REPORTING, or PERSONAL_ELIGIBILITY.
+policy_support: SUPPORTED, UNSUPPORTED, or NOT_APPLICABLE.
+personal_eligibility: UNKNOWN, VERIFIED, or NOT_APPLICABLE.
+conditions: array of exact condition text preserved in directly_supported_facts.
+For ordinary questions about a documented allowance or rule, use POLICY_REPORTING:
+judge whether the conditional rule can be reported, not whether the employee qualifies.
+SUFFICIENT requires SUPPORTED policy, supporting IDs, and facts retaining every condition.
+UNKNOWN personal eligibility does not prevent reporting that conditional rule.
+For explicit verification of personal/group eligibility use PERSONAL_ELIGIBILITY.
+No verified personal facts are supplied in this request: eligibility must be UNKNOWN
+and PERSONAL_ELIGIBILITY must be INSUFFICIENT. Never infer employment status from role.
+For problem solving use GENERAL and the unchanged direct-relevance rules.
+GENERAL can report directly supported procedural guidance and its documented
+triggering conditions. policy_support may be SUPPORTED for that guidance or
+NOT_APPLICABLE; personal_eligibility must be UNKNOWN or NOT_APPLICABLE, never VERIFIED.
+Preserve any procedural conditions in facts and cite their supporting evidence.
+Do not convert an INSUFFICIENT decision by dropping its missing fact.
+For GENERAL, the original five fields plus answer_scope are enough; do not require
+irrelevant eligibility metadata. If documenting procedural conditions, return all
+nine fields with UNKNOWN or NOT_APPLICABLE eligibility and condition-preserving facts.
+POLICY_REPORTING and PERSONAL_ELIGIBILITY must return all nine fields.
+No other keys are permitted.
+"""
+EVIDENCE_SYSTEM_PROMPT += _SCOPE_CONTRACT
+EVIDENCE_REPAIR_SYSTEM_PROMPT += _SCOPE_CONTRACT
+EVIDENCE_RESPONSE_SCHEMA["required"] += ["answer_scope"]
+EVIDENCE_RESPONSE_SCHEMA["properties"].update({
+    "answer_scope": {"enum": [s.value for s in EvidenceAnswerScope]},
+    "policy_support": {"enum": ["SUPPORTED", "UNSUPPORTED", "NOT_APPLICABLE"]},
+    "personal_eligibility": {"enum": ["UNKNOWN", "VERIFIED", "NOT_APPLICABLE"]},
+    "conditions": {"type": "array", "items": {"type": "string", "minLength": 1}},
+})
+EVIDENCE_RESPONSE_SCHEMA["oneOf"] = [
+    {"properties": {"answer_scope": {"const": "GENERAL"}},
+     "not": {"anyOf": [{"required": [key]} for key in ("policy_support", "personal_eligibility", "conditions")]}},
+    {"required": ["policy_support", "personal_eligibility", "conditions"]},
+]
 
 
 class EvidenceEvaluationError(ValueError):
     """Raised when an evaluator result cannot be trusted for routing."""
+
+
+def rejected_evidence_fields(raw: str) -> dict:
+    """Non-authoritative diagnostic shape only: no free text or raw output."""
+    try:
+        value = json.loads(raw)
+    except (ValueError, TypeError):
+        return {"json_object": False}
+    if not isinstance(value, dict):
+        return {"json_object": False}
+    result = {"json_object": True, "validated": False}
+    for key, allowed in {
+        "answer_scope": {s.value for s in EvidenceAnswerScope},
+        "policy_support": {"SUPPORTED", "UNSUPPORTED", "NOT_APPLICABLE"},
+        "personal_eligibility": {"UNKNOWN", "VERIFIED", "NOT_APPLICABLE"},
+        "decision": {"SUFFICIENT", "INSUFFICIENT"},
+    }.items():
+        item = value.get(key)
+        result[key] = item if isinstance(item, str) and item in allowed else "INVALID_OR_MISSING"
+    for key in ("conditions", "directly_supported_facts", "supporting_evidence_ids"):
+        item = value.get(key)
+        result[key + "_count"] = min(len(item), 1000) if isinstance(item, list) else None
+    return result
 
 
 @dataclass(frozen=True)
@@ -180,7 +241,9 @@ def build_evidence_repair_prompt(
 
 
 def parse_evidence_decision(
-    raw_output: str, evidence_count: int | None = None
+    raw_output: str, evidence_count: int | None = None,
+    *, verified_personal_facts: tuple[str, ...] = (), require_scope: bool = False,
+    _defer_condition_wording: bool = False,
 ) -> EvidenceDecision:
     """Strictly validate a classifier response; ambiguity is never accepted."""
     if not isinstance(raw_output, str) or not raw_output.strip():
@@ -198,7 +261,10 @@ def parse_evidence_decision(
         "missing_fact",
         "decision",
     }
-    if set(value) != required_keys:
+    scope_keys = {"answer_scope", "policy_support", "personal_eligibility", "conditions"}
+    if require_scope and "answer_scope" not in value:
+        raise EvidenceEvaluationError("Explicit answer scope is required")
+    if set(value) not in (required_keys, required_keys | {"answer_scope"}, required_keys | scope_keys):
         raise EvidenceEvaluationError(
             "Evidence decision must contain exactly requested_claim, "
             "directly_supported_facts, supporting_evidence_ids, missing_fact, "
@@ -244,6 +310,42 @@ def parse_evidence_decision(
             "Evidence decision must be exactly SUFFICIENT or INSUFFICIENT"
         ) from error
     missing_fact = value["missing_fact"].strip()
+    scope = EvidenceAnswerScope.GENERAL
+    policy, eligibility, conditions = "NOT_APPLICABLE", "UNKNOWN", []
+    if "answer_scope" in value:
+        try:
+            scope = EvidenceAnswerScope(value["answer_scope"])
+        except (ValueError, TypeError) as error:
+            raise EvidenceEvaluationError("Invalid answer scope") from error
+        if not scope_keys <= set(value):
+            if scope is not EvidenceAnswerScope.GENERAL:
+                raise EvidenceEvaluationError("Policy and eligibility scopes require explicit support fields")
+            eligibility = "NOT_APPLICABLE"
+    if scope_keys <= set(value):
+        try:
+            scope = EvidenceAnswerScope(value["answer_scope"])
+        except (ValueError, TypeError) as error:
+            raise EvidenceEvaluationError("Invalid answer scope") from error
+        policy, eligibility, conditions = value["policy_support"], value["personal_eligibility"], value["conditions"]
+        if not isinstance(policy, str) or not isinstance(eligibility, str) or policy not in {"SUPPORTED", "UNSUPPORTED", "NOT_APPLICABLE"} or eligibility not in {"UNKNOWN", "VERIFIED", "NOT_APPLICABLE"}:
+            raise EvidenceEvaluationError("Invalid policy or eligibility support")
+        if not isinstance(conditions, list) or not all(isinstance(c, str) and c.strip() for c in conditions):
+            raise EvidenceEvaluationError("Invalid policy conditions")
+        if eligibility == "VERIFIED" and not verified_personal_facts:
+            raise EvidenceEvaluationError("Personal eligibility lacks trusted verification")
+        if scope is EvidenceAnswerScope.GENERAL and eligibility == "VERIFIED":
+            raise EvidenceEvaluationError("General evidence cannot assert policy eligibility")
+        if status is EvidenceStatus.SUFFICIENT and scope is EvidenceAnswerScope.GENERAL and policy == "UNSUPPORTED":
+            raise EvidenceEvaluationError("Sufficient guidance cannot declare unsupported policy")
+        if scope is EvidenceAnswerScope.PERSONAL_ELIGIBILITY and eligibility == "NOT_APPLICABLE":
+            raise EvidenceEvaluationError("Personal eligibility cannot be not applicable")
+        if status is EvidenceStatus.SUFFICIENT and scope is not EvidenceAnswerScope.GENERAL:
+            if policy != "SUPPORTED":
+                raise EvidenceEvaluationError("Sufficient policy requires supported policy")
+            if scope is EvidenceAnswerScope.PERSONAL_ELIGIBILITY and eligibility != "VERIFIED":
+                raise EvidenceEvaluationError("Personal eligibility remains unknown")
+        if not _defer_condition_wording and status is EvidenceStatus.SUFFICIENT and any(not any(c.casefold() in fact.casefold() for fact in facts) for c in conditions):
+            raise EvidenceEvaluationError("Supported facts omitted policy conditions")
     placeholders = {"string", "non-empty string", "SUFFICIENT or INSUFFICIENT"}
     if any(text.strip() in placeholders for text in [value["requested_claim"], missing_fact, *facts]):
         raise EvidenceEvaluationError("Evidence decision contains schema placeholders")
@@ -283,14 +385,49 @@ def parse_evidence_decision(
         reason=reason,
         missing_information=missing_fact,
         supporting_evidence_ids=tuple(supporting_ids),
+        answer_scope=scope, policy_support=policy,
+        personal_eligibility=eligibility, conditions=tuple(conditions),
     )
 
 
 class LLMEvidenceEvaluator:
+    def validate_conditions(self, question, answer, conditions, results):
+        from knowvia.condition_preservation import validate_condition_preservation
+        try:
+            validate_condition_preservation(self.generator, question, answer, conditions, results)
+        except ValueError:
+            raise ValueError("Grounded policy answer omitted a validated condition or could not be validated") from None
+
     """Evidence classifier backed by a replaceable local generation provider."""
 
-    def __init__(self, generator: GenerationProvider) -> None:
+    def __init__(self, generator: GenerationProvider, *, require_scope: bool = False) -> None:
         self.generator = generator
+        self.require_scope = require_scope
+
+    def _parse(self, raw, results, question=None):
+        # Only this source-aware path may replace literal containment with the
+        # existing bounded semantic check. Standalone parsing stays strict.
+        decision = parse_evidence_decision(raw, len(results), require_scope=self.require_scope,
+                                           _defer_condition_wording=True)
+        constraint = question_scope_constraint(question) if self.require_scope and question is not None else None
+        if constraint is not None and decision.answer_scope is not constraint:
+            raise EvidenceEvaluationError(f"Answer scope conflicts with question intent; expected {constraint.value}")
+        if decision.status is EvidenceStatus.SUFFICIENT:
+            selected = [results[i - 1].chunk.text.casefold() for i in decision.supporting_evidence_ids]
+            if any(not any(condition.casefold() in text for text in selected) for condition in decision.conditions):
+                raise EvidenceEvaluationError("Policy condition is not anchored in supporting evidence")
+            facts = json.loads(raw)["directly_supported_facts"]
+            if any(not any(condition.casefold() in fact.casefold() for fact in facts)
+                   for condition in decision.conditions):
+                from knowvia.condition_preservation import validate_condition_preservation
+                try:
+                    validate_condition_preservation(
+                        self.generator, question or "", "\n".join(facts), decision.conditions,
+                        [results[i - 1] for i in decision.supporting_evidence_ids],
+                    )
+                except ValueError:
+                    raise EvidenceEvaluationError("Supported facts omitted or altered policy conditions") from None
+        return decision
 
     @property
     def evaluator_name(self) -> str:
@@ -299,22 +436,23 @@ class LLMEvidenceEvaluator:
     def evaluate(
         self, question: str, results: list[RetrievalResult]
     ) -> EvidenceDecision:
+        constraint = scope_constraint_instruction(question) if self.require_scope else ''
         raw_output = self.generator.generate(
             EVIDENCE_SYSTEM_PROMPT,
-            build_evidence_user_prompt(question, results),
+            build_evidence_user_prompt(question, results) + constraint,
         )
         try:
-            return parse_evidence_decision(raw_output, len(results))
+            return self._parse(raw_output, results, question)
         except EvidenceEvaluationError as error:
             repaired_output = self.generator.generate(
                 EVIDENCE_REPAIR_SYSTEM_PROMPT,
-                build_evidence_repair_prompt(question, results, error),
+                build_evidence_repair_prompt(question, results, error) + constraint,
             )
             try:
-                return parse_evidence_decision(repaired_output, len(results))
+                return self._parse(repaired_output, results, question)
             except EvidenceEvaluationError:
                 recovered = recover_explicit_first_person_permission(question, results)
-                if recovered is not None:
+                if recovered is not None and not self.require_scope:
                     return recovered
                 raise
 
@@ -322,6 +460,7 @@ class LLMEvidenceEvaluator:
         self, question: str, results: list[RetrievalResult]
     ) -> tuple[EvidenceDecision, EvidenceEvaluationDiagnostics]:
         """Evaluate while retaining failure details for offline evaluation only."""
+        constraint = scope_constraint_instruction(question) if self.require_scope else ''
         if not results:
             decision = EvidenceDecision(
                 status=EvidenceStatus.INSUFFICIENT,
@@ -339,7 +478,7 @@ class LLMEvidenceEvaluator:
         try:
             raw_output = self.generator.generate(
                 EVIDENCE_SYSTEM_PROMPT,
-                build_evidence_user_prompt(question, results),
+                build_evidence_user_prompt(question, results) + constraint,
             )
         except Exception as error:
             decision = _invalid_evidence_decision()
@@ -352,7 +491,7 @@ class LLMEvidenceEvaluator:
             )
 
         try:
-            decision = parse_evidence_decision(raw_output, len(results))
+            decision = self._parse(raw_output, results, question)
             return decision, EvidenceEvaluationDiagnostics(
                 raw_output=raw_output,
                 exception_type=None,
@@ -364,7 +503,7 @@ class LLMEvidenceEvaluator:
             try:
                 raw_output = self.generator.generate(
                     EVIDENCE_REPAIR_SYSTEM_PROMPT,
-                    build_evidence_repair_prompt(question, results, error),
+                    build_evidence_repair_prompt(question, results, error) + constraint,
                 )
             except Exception as provider_error:
                 decision = _invalid_evidence_decision()
@@ -376,7 +515,7 @@ class LLMEvidenceEvaluator:
                     final_decision=decision.status,
                 )
             try:
-                decision = parse_evidence_decision(raw_output, len(results))
+                decision = self._parse(raw_output, results, question)
                 return decision, EvidenceEvaluationDiagnostics(
                     raw_output=raw_output,
                     exception_type=None,
@@ -387,7 +526,7 @@ class LLMEvidenceEvaluator:
             except Exception as repair_error:
                 error = repair_error
             recovered = recover_explicit_first_person_permission(question, results)
-            if recovered is not None:
+            if recovered is not None and not self.require_scope:
                 return recovered, EvidenceEvaluationDiagnostics(
                     raw_output=raw_output,
                     exception_type=None,

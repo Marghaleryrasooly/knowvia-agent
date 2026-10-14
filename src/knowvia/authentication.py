@@ -123,6 +123,15 @@ class SqliteAuthenticatedSessionStore:
             connection.commit()
         return cursor.rowcount == 1
 
+    def revoke_all(self, account_id: str) -> int:
+        with closing(self._connect()) as connection:
+            cursor = connection.execute(
+                "UPDATE authenticated_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL",
+                (self._now().isoformat(), account_id),
+            )
+            connection.commit()
+            return cursor.rowcount
+
     @staticmethod
     def _session(row: sqlite3.Row) -> AuthenticatedSession:
         return AuthenticatedSession(row["session_id"], row["account_id"], datetime.fromisoformat(row["created_at"]), datetime.fromisoformat(row["expires_at"]), datetime.fromisoformat(row["revoked_at"]) if row["revoked_at"] else None)

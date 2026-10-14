@@ -633,6 +633,17 @@ class FollowUpResolver:
     _problem_clarification_reference = re.compile(
         r"^\s*(?:it|that|this)\b", re.I
     )
+    # A named/noun-phrase subject followed by an embedded question can supply
+    # its own antecedent: "How does Atlas decide which standards it follows?"
+    # Do not apply this to bare pronoun subjects or ordinary "what if that" follow-ups.
+    _local_subject_reference = re.compile(
+        r"^\s*(?i:how|what|why|when|where)\s+"
+        r"(?i:does|do|can|could|will|would|is|are)\s+"
+        r"(?!(?i:it|this|that|they|them|those|he|she|we|you|there)\b)"
+        r"(?:[A-Z][\w-]+|(?i:the|a|an|my|our|your)\s+[\w-]+)\b"
+        r"[^?!\.]{1,120}\b(?i:which|what|whose)\b"
+        r"[^?!\.]{1,80}\b(?i:it)\b"
+    )
     _ambiguous_action_reference = re.compile(
         r"\b(?:create|make|open|raise|file|submit|log)\s+(?:one|it)\s+"
         r"(?:for\s+)?(?:that|this|it)\b",
@@ -706,7 +717,16 @@ class FollowUpResolver:
 
         current_selection = self.selector.select(request, available_skills)
         reference = self._referential.fullmatch(request)
-        contextual_reference = bool(self._contextual_knowledge_reference.search(request))
+        local_reference = self._local_subject_reference.search(request)
+        # Mask only this locally bound "it" for detection, not other unresolved
+        # references later in the question. Never rewrite the employee's request.
+        reference_request = request
+        if local_reference is not None:
+            reference_request = (
+                request[:local_reference.end() - 2] + "subject"
+                + request[local_reference.end():]
+            )
+        contextual_reference = bool(self._contextual_knowledge_reference.search(reference_request))
         if reference is None and not contextual_reference:
             return ResolvedRequest(request, request, ResolutionStatus.READY)
 

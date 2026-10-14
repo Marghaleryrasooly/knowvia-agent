@@ -27,12 +27,12 @@ def test_provider_classes_preserve_common_embedding_interface() -> None:
     assert callable(OpenAIEmbeddingProvider.embed)
 
 
-def test_ask_defaults_to_ollama_and_three_chunks(monkeypatch) -> None:
+def test_ask_defaults_to_groq_and_three_chunks(monkeypatch) -> None:
     monkeypatch.delenv("KNOWVIA_GENERATION_PROVIDER", raising=False)
 
     args = cli.create_parser().parse_args(["ask", "What is the leave policy?"])
 
-    assert args.generation_provider == "ollama"
+    assert args.generation_provider == "groq"
     assert args.top_k == 3
 
 

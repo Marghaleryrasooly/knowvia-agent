@@ -35,7 +35,7 @@ def demo_config(**changes) -> DeploymentConfig:
 
 
 def test_production_and_demo_defaults_are_fail_closed() -> None:
-    production = DeploymentConfig.from_environment({})
+    production = DeploymentConfig.from_environment({"GROQ_API_KEY": "fictional"})
     assert production.environment is ApplicationEnvironment.PRODUCTION
     assert production.secure_cookie is True
     assert production.development_identity_override is False
@@ -87,6 +87,7 @@ def test_public_demo_rejects_debug_details_and_real_jira() -> None:
 
 def test_jira_credentials_alone_never_enable_real_jira() -> None:
     config = DeploymentConfig.from_environment({
+        "GROQ_API_KEY": "fictional",
         "KNOWVIA_ENVIRONMENT": "production",
         "JIRA_BASE_URL": "https://example.atlassian.net",
         "JIRA_USER_EMAIL": "person@example.com",
@@ -105,6 +106,7 @@ def test_selected_jira_requires_explicit_server_side_enablement() -> None:
             "KNOWVIA_AGENT_TOOL": "jira",
         })
     enabled = DeploymentConfig.from_environment({
+        "GROQ_API_KEY": "fictional",
         "KNOWVIA_ENVIRONMENT": "production",
         "KNOWVIA_AGENT_TOOL": "jira",
         "KNOWVIA_ENABLE_REAL_JIRA_MUTATIONS": "true",

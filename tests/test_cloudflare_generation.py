@@ -100,7 +100,7 @@ def test_factories_use_correct_settings_and_do_not_change_ollama_default(monkeyp
 def test_configuration_fails_closed_without_secrets():
     with pytest.raises(DeploymentConfigurationError, match="not configured"):
         DeploymentConfig.from_environment({"KNOWVIA_GENERATION_PROVIDER": "cloudflare"})
-    config = DeploymentConfig.from_environment({"KNOWVIA_GENERATION_PROVIDER": "cloudflare",
+    config = DeploymentConfig.from_environment({"KNOWVIA_GENERATION_PROVIDER": "cloudflare", "KNOWVIA_EVIDENCE_EVALUATOR": "cloudflare",
         "CLOUDFLARE_ACCOUNT_ID": ACCOUNT, "CLOUDFLARE_API_TOKEN": TOKEN})
     assert TOKEN not in repr(config)
     assert config.cloudflare_credentials_configured

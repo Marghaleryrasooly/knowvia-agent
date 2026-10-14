@@ -1,9 +1,74 @@
-# Knowvia Agent — M13 Employee Application
+# Knowvia — Evidence-Aware Enterprise AI Agent
+
+## Current implementation
+
+Knowvia is a university demonstration using fictional NovaTech company documents.
+Groq `openai/gpt-oss-120b` is the default evidence-evaluation and grounded-answer
+model. Gemini handles routing in the public demonstration; the deterministic
+router remains available for offline tests. Ollama is an optional local alternative,
+not a requirement for the public website. Evidence validation, supporting sources,
+RBAC and confirmation-gated mock ticket actions remain enforced.
+
+The employee interface includes authenticated chat and persistent history.
+The separate `/admin` dashboard supports account provisioning, activation,
+deactivation, trusted roles and permissions, sanitized administrative activity,
+and Markdown knowledge management with explicit access controls, atomic index
+publication and rollback. Administrator bootstrap is private and has no default
+password. See [administration setup](docs/admin-foundation.md) and
+[knowledge management](docs/admin-knowledge-management.md).
+
+The public university demonstration uses Tailscale Funnel HTTPS at
+https://desktop-md6j59m.taild8d8ea.ts.net/. Availability requires the host laptop,
+Knowvia process and Funnel to remain running. SQLite and uploaded knowledge stay
+on the laptop's persistent private disk. Public self-registration is intentionally
+disabled: an authorized administrator provisions demonstration accounts and shares
+unique credentials privately. Never use test-fixture passwords publicly.
+
+### Current quick start
+
+```powershell
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -e ".[dev,gemini]"
+Copy-Item .env.example .env
+```
+
+Copy the template only for a fresh checkout; never overwrite existing private
+configuration. Set `GROQ_API_KEY` and `GEMINI_API_KEY` privately in the gitignored
+`.env`, and select `KNOWVIA_AGENT_ROUTER=gemini`. The bundled vector index is
+included; rebuilding it is unnecessary for normal startup. Local embeddings may
+download their model on first use; the existing ONNX provider is also available.
+
+For local HTTP development, use the documented development profile and explicit
+`KNOWVIA_AUTH_COOKIE_SECURE=false`, then run
+`.venv\Scripts\python.exe -m knowvia.web`. Never disable Secure cookies for the
+public HTTPS profile. Follow the [Tailscale deployment checklist](docs/tailscale-demo.md)
+for public startup, trusted hosts and persistent data. The launcher does not
+activate Funnel itself. Keep public ticket backends mocked and real Jira disabled.
+
+To use the optional local reference model, select both
+`KNOWVIA_GENERATION_PROVIDER=ollama` and `KNOWVIA_EVIDENCE_EVALUATOR=ollama`,
+and run the configured Ollama model locally. There is no automatic provider fallback.
+
+The milestone sections below retain development history and reference commands;
+the current setup above supersedes historical defaults and feature limitations.
+
+## University demo publication and hosting
+
+For Wednesday, use [the persistent Tailscale checklist](docs/tailscale-demo.md).
+Its local-only launcher explicitly selects Groq after acceptance and never
+activates Funnel itself. The earlier [Render preparation](docs/university-deployment.md)
+and `render.yaml` remain inactive alternatives, not the selected deployment:
+their ephemeral storage does not satisfy the persistence requirement.
+Inference now defaults to accepted Groq; explicit Ollama remains available. Local setup uses
+`python -m pip install -e ".[dev,gemini]"`, an ignored `.env` based on
+`.env.example`, and `python -m knowvia.web`; the cloud image uses
+`python -m knowvia.production`. Never publish credentials, runtime databases or
+saved evaluation artifacts.
 
 ## Cloudflare Llama provider candidate
 
 The optional `cloudflare` generation/evidence adapter uses the direct Workers AI
-REST API with `@cf/meta/llama-3.2-3b-instruct`. Ollama remains the default and
+REST API with `@cf/meta/llama-3.2-3b-instruct`. Groq is now the default and
 deployment examples are not switched automatically. Treat the remote provider
 as a candidate until the live knowledge comparison and safety gates pass.
 
@@ -220,7 +285,8 @@ low-scoring result should be rejected; abstention belongs to a later milestone.
 ### Grounded answer generation
 
 The `ask` command sends the employee question and top-k retrieved chunks to
-Ollama. The default model is `llama3.2:latest`. Its system prompt says to use
+the selected provider. The current default is Groq `openai/gpt-oss-120b`;
+the optional Ollama reference model is `llama3.2:latest`. Its system prompt says to use
 only the supplied company context for company-specific claims, avoid invented
 policies, keep the answer concise, and report when the supplied information is
 clearly insufficient.
@@ -328,7 +394,7 @@ Copy-Item .env.example .env
 
 The real `.env` and generated vector index are ignored by Git.
 
-### Install Ollama for M2
+### Optional local Ollama reference setup
 
 Ollama is a separate Windows application; it is not installed by `pip`. Install
 Ollama, make sure it is running, and confirm that the configured model exists:
@@ -380,7 +446,7 @@ python -m knowvia.cli ask "What should I do if my VPN fails?" --top-k 3
 ```
 
 The workflow is unchanged through retrieval. The `ask` command then builds a
-grounded prompt, calls local Ollama, prints the answer, and prints sources from
+grounded prompt, calls the selected provider, prints the answer, and prints sources from
 the retrieved chunk metadata:
 
 ```text
@@ -417,7 +483,7 @@ python -m knowvia.cli agent "Create an IT ticket."
 python -m knowvia.cli agent "Approve my expense report."
 ```
 
-Knowledge requests still require the local index and Ollama because they call
+Knowledge requests require the local index and the configured inference provider because they call
 the complete M1–M3 pipeline. Ticket actions, clarification, and unsupported
 actions use the deterministic router and do not call Ollama. The local mock
 ticket store resets on each CLI invocation.
@@ -640,7 +706,8 @@ AgentRouter                     AgentTool
 └── GeminiAgentRouter          └── JiraTicketTool
 ```
 
-The deterministic router and mock tool remain the defaults. Gemini only
+The deterministic router remains an offline/local option; public routing uses Gemini
+and ticket tools remain mocked. Gemini only
 proposes a decision. It receives the original employee request and public
 function schemas—never RAG chunks, Jira configuration, credentials,
 environment variables, authentication headers, pending-action state, or audit
@@ -1158,8 +1225,8 @@ identity proofing.
 
 ## M14.2: verified employee account registration
 
-M14.2 adds an internal registration service and SQLite account repository, but
-does not yet expose registration or login through the web application. A typed
+M14.2 introduced the registration service and SQLite account repository.
+The current application exposes login and profile-controlled registration. A typed
 registration request contains only employee ID, work email, password, and
 password confirmation. The service first verifies the same active employee
 through the M14.1 directory boundary and resolves the existing M9 identity; only
@@ -1174,8 +1241,8 @@ objects. Passwords use `argon2-cffi` and a bounded 12–128 character policy;
 arbitrary composition rules are intentionally avoided. Duplicate employees or
 emails fail atomically through database uniqueness constraints.
 
-M14.2 does not add login sessions, cookies, registration/login pages, password
-reset, email verification, SSO/OIDC, or change the development identity selector.
+Later milestones added login sessions, cookies, authentication pages and account
+administration. Password reset, email verification and SSO/OIDC remain unimplemented.
 
 ## M14.3: login authentication and server-side sessions
 
@@ -1201,8 +1268,10 @@ supplied identities. Local HTTP development may explicitly set
 fallback for an invalid authentication cookie. Demo directory seeding is also
 explicit through `KNOWVIA_SEED_DEMO_EMPLOYEE_DIRECTORY=true`.
 
-M14.3 intentionally adds no login/register UI, password reset/change, MFA,
-email verification, SSO/OIDC, account administration, or rate limiting.
+The current application includes login/registration UI, a separate admin dashboard,
+trusted account administration and login abuse controls. Public registration is
+disabled in the secure Funnel profile. Password reset/change, MFA, email verification
+and SSO/OIDC remain unimplemented.
 
 ## M10: ticket lifecycle and notification events
 
@@ -1417,9 +1486,9 @@ Copy-Item .env.example .env
 .venv\Scripts\python.exe -m knowvia.cli index
 ```
 
-Local embeddings download once on first use. Ollama must be running with the
-configured generation and evidence model (the default is `llama3.2:latest`).
-Gemini routing is optional; the deterministic router remains available.
+Local embeddings download once on first use. Groq is the default inference provider
+and requires its server-side API key; Ollama is needed only when explicitly selected.
+The public demonstration uses Gemini routing; the deterministic router remains available.
 
 ### Start the employee application
 
@@ -1540,7 +1609,9 @@ KNOWVIA_ENABLE_REAL_JIRA_MUTATIONS=false
 KNOWVIA_ENABLE_HSTS=true
 ```
 
-Demo registration verifies only the seeded fictional directory; visitors do
+This registration-enabled example is for an explicitly opted-in fictional sandbox,
+not the secure Funnel profile, which disables registration and automatic seeding.
+Sandbox registration verifies only the seeded fictional directory; visitors do
 not choose roles or permissions. Demo ticket creation retains proposal and
 confirmation, produces `DEMO_IT-*` local identifiers, and never contacts
 Atlassian. A visitor creates their own password (12–128 characters) using one
@@ -1631,11 +1702,9 @@ the image build. Model binaries are not committed to Git and are not downloaded
 on each service restart. The runtime index records the same embedding model;
 the existing retriever continues to reject a model/index mismatch.
 
-Gemini is an optional hosted semantic router and its key must be supplied by a
-server-side platform secret. The frozen M1-M14 answer generator and evidence
-evaluator still use Ollama. A public host must therefore provide a private,
-server-accessible `OLLAMA_HOST` with the documented models, or the knowledge
-path will fail closed. M15.2 intentionally does not replace that architecture.
+Gemini routing and Groq inference keys must be supplied through server-side secrets.
+Evidence evaluation and grounded generation default to Groq GPT-OSS 120B, so public
+startup does not require Ollama. Provider errors fail closed without automatic fallback.
 
 ### Container build and run
 
@@ -1650,7 +1719,7 @@ docker build -t knowvia:demo .
 At runtime, inject secrets through the hosting platform and mount persistent
 storage at `/var/lib/knowvia`. `deploy/demo.env.example` documents non-secret
 public-demo settings and secret placeholders. Do not pass that file unchanged:
-replace the example hostname and supply Gemini/Ollama settings through the
+replace the example hostname and supply Gemini/Groq settings through the
 server-side platform configuration.
 
 A public demo must keep `KNOWVIA_AGENT_TOOL=mock`,
@@ -1667,8 +1736,8 @@ credentials into the public-demo service.
   records, and the runtime index on restart.
 - Container image builds require enough memory/network capacity to install
   Torch/Sentence Transformers and download the embedding model.
-- Runtime knowledge answers require access to the configured Ollama endpoint;
-  Gemini alone is not the answer-generation provider.
+- Runtime knowledge answers require access to Groq by default; only explicitly
+  selected Ollama requires an Ollama endpoint. Gemini routing is separate.
 - TLS termination, domain/DNS setup, managed secrets, backups, abuse controls,
   logging/metrics, and provider-specific deployment manifests remain M15.3+.
 
@@ -1734,3 +1803,13 @@ Local `.env` files, SQLite runtime state, conversations, accounts, sessions,
 audit logs, model caches, test/build output, and generated artifacts are not
 publication content. The deterministic `data/knowvia_index.json` seed remains
 publishable because M15.2 uses it to bootstrap a fresh runtime data directory.
+
+## Accepted inference verification (October 14, 2026)
+
+Normal CLI/web environment selection now defaults to Groq `openai/gpt-oss-120b`
+for evidence evaluation and grounded generation. Set the server-side `GROQ_API_KEY`
+in the gitignored `.env`; missing credentials fail closed. Gemini routing is unchanged.
+Ollama remains available locally by explicitly setting both
+`KNOWVIA_GENERATION_PROVIDER=ollama` and `KNOWVIA_EVIDENCE_EVALUATOR=ollama`.
+There is no automatic fallback. The historical 57-turn result remains unchanged;
+the final authorized-IT fix and three safety contrasts passed separately.

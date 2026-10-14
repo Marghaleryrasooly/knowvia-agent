@@ -139,7 +139,7 @@ class DeterministicKnowledgeRequestNormalizer:
             return self._unchanged(request)
 
         normalized = (
-            "What documented company guidance or troubleshooting applies to this "
+            "What documented company guidance directly addresses this "
             f"reported problem: {request}"
         )
         return NormalizedKnowledgeRequest(

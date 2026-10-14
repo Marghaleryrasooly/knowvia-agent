@@ -143,12 +143,12 @@ def test_v2_rubric_covers_direct_support_and_unsupported_inference() -> None:
     assert "A related fact is NOT automatically sufficient" in prompt
 
 
-def test_v2_few_shots_are_small_balanced_and_generic() -> None:
+def test_scoped_contract_has_no_obsolete_five_field_examples() -> None:
     prompt = EVIDENCE_SYSTEM_PROMPT
 
-    assert prompt.count("Output: {") == 4
-    assert prompt.count('"decision":"SUFFICIENT"') == 2
-    assert prompt.count('"decision":"INSUFFICIENT"') == 2
+    assert "Output: {" not in prompt
+    assert "POLICY_REPORTING" in prompt and "PERSONAL_ELIGIBILITY" in prompt
+    assert "UNKNOWN" in prompt
     assert "NovaTech" not in prompt
     assert "ChatGPT" not in prompt
     assert "main branch" not in prompt

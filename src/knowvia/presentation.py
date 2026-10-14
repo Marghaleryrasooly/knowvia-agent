@@ -146,6 +146,12 @@ class DeterministicEmployeeResponsePresenter:
                 "You don’t have permission to access that company capability.",
             )
 
+        if result.confirmation_failed:
+            return EmployeeResponse(
+                EmployeeResponseKind.ACTION_FAILURE,
+                "I couldn't validate that confirmation. No action was executed.",
+            )
+
         if (
             result.decision.decision is AgentDecisionKind.UNSUPPORTED
             and result.decision.reason.startswith(

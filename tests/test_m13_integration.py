@@ -304,7 +304,7 @@ def test_ticket_proposal_cancel_and_confirmation_use_backend_lifecycle(tmp_path)
         f'/api/proposals/{proposed["action"]["proposal_id"]}/confirm',
         json={"identity_id": "employee-001", "session_id": "ticket-1"},
     ).json()
-    assert repeated["kind"] == "UNSUPPORTED"
+    assert repeated["kind"] == "ACTION_FAILURE"
     assert factory.tool.executions == 0
 
     second = chat(web, "Create an IT ticket because my VPN is broken.", session="ticket-2")
@@ -334,7 +334,7 @@ def test_ticket_proposal_cancel_and_confirmation_use_backend_lifecycle(tmp_path)
         f'/api/proposals/{second["action"]["proposal_id"]}/confirm',
         json={"identity_id": "employee-001", "session_id": "ticket-2"},
     ).json()
-    assert stale_repeat["kind"] == "UNSUPPORTED"
+    assert stale_repeat["kind"] == "ACTION_FAILURE"
     assert stale_repeat["proposal_update"]["status"] == "EXECUTED"
     assert factory.tool.executions == 1
 
@@ -430,7 +430,7 @@ def test_exact_contextual_ticket_regression_uses_do_support_problem(tmp_path) ->
         f'/api/proposals/{proposed["action"]["proposal_id"]}/confirm',
         json={"identity_id": "employee-001", "session_id": "vpn-do-support"},
     ).json()
-    assert repeated["kind"] == "UNSUPPORTED"
+    assert repeated["kind"] == "ACTION_FAILURE"
     assert factory.tool.executions == 1
 
 

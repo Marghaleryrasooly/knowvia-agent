@@ -33,7 +33,7 @@ def test_declarative_problem_reports_become_informational_questions(utterance) -
     assert result.original_request == utterance
     assert utterance in result.normalized_request
     assert result.normalized_request.startswith(
-        "What documented company guidance or troubleshooting applies"
+        "What documented company guidance directly addresses this reported problem: "
     )
     assert "ticket" not in result.normalized_request.casefold()
 

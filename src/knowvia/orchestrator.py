@@ -298,7 +298,7 @@ class AgentOrchestrator:
     @staticmethod
     def _safe_confirmation_failure(message: str) -> AgentResult:
         decision = AgentDecision(AgentDecisionKind.UNSUPPORTED, reason="Confirmation could not be validated.")
-        return AgentResult(decision, message)
+        return AgentResult(decision, message, confirmation_failed=True)
 
     @staticmethod
     def _permission_denied(reason: str) -> AgentResult:

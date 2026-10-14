@@ -255,6 +255,29 @@ async function submitConversationModal(event) {
   }
 }
 
+// Deliberately bounded Markdown: only generated paragraphs, lists and bold.
+// Escape all input first; HTML and Markdown links remain inert visible text.
+function renderAnswerMarkdown(value) {
+  const inline = text => escapeHtml(text).replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+  const blocks = [];
+  let paragraph = [], items = [], listType = null;
+  const flushParagraph = () => { if (paragraph.length) blocks.push(`<p>${paragraph.map(inline).join("<br>")}</p>`); paragraph = []; };
+  const flushList = () => { if (items.length) blocks.push(`<${listType}>${items.map(item => `<li>${inline(item)}</li>`).join("")}</${listType}>`); items = []; listType = null; };
+  for (const line of String(value ?? "").replace(/\r\n?/g, "\n").split("\n")) {
+    if (!line.trim()) { flushParagraph(); flushList(); continue; }
+    const bullet = line.match(/^\s*[-*+]\s+(.+)$/);
+    const numbered = line.match(/^\s*\d+[.)]\s+(.+)$/);
+    if (bullet || numbered) {
+      flushParagraph();
+      const type = bullet ? "ul" : "ol";
+      if (listType && listType !== type) flushList();
+      listType = type; items.push((bullet || numbered)[1]);
+    } else { flushList(); paragraph.push(line); }
+  }
+  flushParagraph(); flushList();
+  return blocks.join("");
+}
+
 function renderMessage(message) {
   if (message.role === "user") return `<article class="message user"><div class="bubble">${escapeHtml(message.text)}</div></article>`;
   const sources = (message.sources || []).length ? `<div class="source-block"><div class="source-label">Supporting sources</div><div class="source-grid" aria-label="Supporting sources">${message.sources.map(s => `<div class="source-card"><small>${escapeHtml(s.document)}</small><strong>${escapeHtml(s.section)}</strong></div>`).join("")}</div></div>` : "";
@@ -265,7 +288,7 @@ function renderMessage(message) {
   const action = message.action ? `<div class="action-card ${actionPending ? "" : `terminal ${actionStatus.toLowerCase()}`}" data-proposal="${escapeHtml(message.action.proposal_id)}"><div class="card-kicker">${actionLabel}</div><div class="card-title">${escapeHtml(message.action.title)}</div><div class="card-description">${escapeHtml(message.action.description)}</div>${actionReference}${actionPending ? `<div class="card-actions"><button class="confirm">Create ticket</button><button class="cancel">Cancel</button></div>` : ""}</div>` : "";
   const ticket = message.ticket ? `<div class="ticket-card"><div class="ticket-icon">✓</div><div><small>IT ticket</small><div class="card-title">${escapeHtml(message.ticket.ticket_id)}</div></div><span class="status-pill">${escapeHtml(message.ticket.status)}</span></div>` : "";
   const demo = message.demo ? `<details class="demo-card"><summary>Demo details</summary><div>Skills: ${escapeHtml((message.demo.skills || []).join(", ") || "none")}</div><div>Capabilities: ${escapeHtml((message.demo.capabilities || []).join(" → "))}</div><div>Grounding: ${escapeHtml(message.demo.grounding)}</div><div>Action transport: ${escapeHtml(message.demo.action_transport)}</div><div>Authorization: ${escapeHtml(message.demo.authorization)}</div></details>` : "";
-  return `<article class="message assistant ${escapeHtml((message.kind || "").toLowerCase())}"><div class="assistant-label">Knowvia</div><div class="bubble">${escapeHtml(message.text)}</div>${sources}${action}${ticket}${demo}</article>`;
+  return `<article class="message assistant ${escapeHtml((message.kind || "").toLowerCase())}"><div class="assistant-label">Knowvia</div><div class="bubble answer-markdown">${renderAnswerMarkdown(message.text)}</div>${sources}${action}${ticket}${demo}</article>`;
 }
 function bindActionCards() { document.querySelectorAll(".action-card").forEach(card => { const confirm = card.querySelector(".confirm"); const cancel = card.querySelector(".cancel"); if (confirm) confirm.onclick = () => proposal(card, "confirm"); if (cancel) cancel.onclick = () => proposal(card, "cancel"); }); }
 function renderAll() {

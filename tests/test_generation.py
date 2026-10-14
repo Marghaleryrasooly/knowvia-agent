@@ -44,7 +44,9 @@ def test_evidence_factory_constrains_initial_and_repair_without_changing_prompts
     calls = []
     outputs = ['not JSON', json.dumps({
         "requested_claim": "The documented procedure", "directly_supported_facts": ["Use the portal."],
-        "supporting_evidence_ids": [1], "missing_fact": "", "decision": "SUFFICIENT"})]
+        "supporting_evidence_ids": [1], "missing_fact": "", "decision": "SUFFICIENT",
+        "answer_scope": "GENERAL", "policy_support": "NOT_APPLICABLE",
+        "personal_eligibility": "UNKNOWN", "conditions": []})]
     def transport(url, payload, timeout):
         calls.append(payload)
         return {"message": {"content": outputs.pop(0)}}

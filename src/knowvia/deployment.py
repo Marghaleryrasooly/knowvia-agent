@@ -54,6 +54,7 @@ class DeploymentConfig:
     generation_provider: str = "ollama"
     evidence_provider: str = "ollama"
     cloudflare_credentials_configured: bool = False
+    groq_api_key_configured: bool = False
 
     @classmethod
     def from_environment(cls, environment: Mapping[str, str] | None = None) -> "DeploymentConfig":
@@ -90,8 +91,9 @@ class DeploymentConfig:
             allowed_hosts=hosts,
             hsts_enabled=_flag(values, "KNOWVIA_ENABLE_HSTS", False),
             embedding_provider=values.get("KNOWVIA_EMBEDDING_PROVIDER", "local").strip().lower(),
-            generation_provider=values.get("KNOWVIA_GENERATION_PROVIDER", "ollama").strip().lower(),
-            evidence_provider=values.get("KNOWVIA_EVIDENCE_EVALUATOR", "ollama").strip().lower(),
+            generation_provider=values.get("KNOWVIA_GENERATION_PROVIDER", "groq").strip().lower(),
+            evidence_provider=values.get("KNOWVIA_EVIDENCE_EVALUATOR", "groq").strip().lower(),
+            groq_api_key_configured=bool(values.get("GROQ_API_KEY", "").strip()),
             cloudflare_credentials_configured=all(bool(values.get(name, "").strip()) for name in (
                 "CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN")),
         )
@@ -99,8 +101,12 @@ class DeploymentConfig:
         return config
 
     def validate(self) -> None:
-        if self.generation_provider not in {"ollama", "cloudflare"} or self.evidence_provider not in {"ollama", "cloudflare"}:
+        if self.generation_provider not in {"ollama", "cloudflare", "gemini", "groq"} or self.evidence_provider not in {"ollama", "cloudflare", "gemini", "groq"}:
             raise DeploymentConfigurationError("Generation/evidence provider is invalid")
+        if "groq" in {self.generation_provider, self.evidence_provider} and not self.groq_api_key_configured:
+            raise DeploymentConfigurationError("Groq inference is selected but not configured")
+        if "gemini" in {self.generation_provider, self.evidence_provider} and not self.gemini_api_key_configured:
+            raise DeploymentConfigurationError("Gemini inference is selected but not configured")
         if "cloudflare" in {self.generation_provider, self.evidence_provider} and not self.cloudflare_credentials_configured:
             raise DeploymentConfigurationError("Cloudflare is selected but not configured")
         if self.embedding_provider not in {"local", "openai", "onnx"}:

@@ -55,6 +55,10 @@ from knowvia.generation import (
     OllamaGenerationProvider,
     CloudflareGenerationProvider,
     DEFAULT_CLOUDFLARE_MODEL,
+    GeminiGenerationProvider,
+    DEFAULT_GEMINI_INFERENCE_MODEL,
+    GroqGenerationProvider,
+    DEFAULT_GROQ_MODEL,
 )
 from knowvia.retrieval import Retriever, build_index
 from knowvia.orchestrator import AgentOrchestrator
@@ -106,6 +110,10 @@ def create_embedder(provider: str) -> EmbeddingProvider:
 
 def create_generator(provider: str) -> GenerationProvider:
     """Create the configured generation provider."""
+    if provider == "groq":
+        return _create_groq_generator(evidence=False)
+    if provider == "gemini":
+        return _create_gemini_generator(evidence=False)
     if provider == "cloudflare":
         return _create_cloudflare_generator(evidence=False)
     if provider == "ollama":
@@ -118,8 +126,12 @@ def create_generator(provider: str) -> GenerationProvider:
 
 def create_evidence_evaluator(provider: str, *, structured_output: bool = False) -> EvidenceEvaluator:
     """Create the fail-closed evidence evaluator used before answer generation."""
+    if provider == "groq":
+        return LLMEvidenceEvaluator(_create_groq_generator(evidence=True), require_scope=True)
+    if provider == "gemini":
+        return LLMEvidenceEvaluator(_create_gemini_generator(evidence=True), require_scope=True)
     if provider == "cloudflare":
-        return LLMEvidenceEvaluator(_create_cloudflare_generator(evidence=True))
+        return LLMEvidenceEvaluator(_create_cloudflare_generator(evidence=True), require_scope=True)
     if provider == "ollama":
         generator = OllamaGenerationProvider(
             model=os.getenv(
@@ -132,8 +144,35 @@ def create_evidence_evaluator(provider: str, *, structured_output: bool = False)
             # Candidate remains opt-in until live semantic acceptance succeeds.
             response_schema=EVIDENCE_RESPONSE_SCHEMA if structured_output else None,
         )
-        return LLMEvidenceEvaluator(generator)
+        return LLMEvidenceEvaluator(generator, require_scope=True)
     raise ValueError(f"Unknown evidence evaluator: {provider}")
+
+
+def _create_groq_generator(*, evidence: bool) -> GroqGenerationProvider:
+    prefix = "GROQ_EVIDENCE" if evidence else "GROQ_GENERATION"
+    try:
+        timeout = float(os.getenv("GROQ_TIMEOUT_SECONDS", "120"))
+        tokens = int(os.getenv(prefix + "_MAX_COMPLETION_TOKENS", "2048" if evidence else "1024"))
+    except ValueError:
+        raise ValueError("Groq inference configuration is invalid") from None
+    return GroqGenerationProvider(
+        api_key=os.getenv("GROQ_API_KEY", ""),
+        model=os.getenv(prefix + "_MODEL", DEFAULT_GROQ_MODEL), timeout=timeout,
+        temperature=0.0 if evidence else 0.1, max_output_tokens=tokens,
+        reasoning_effort=os.getenv(prefix + "_REASONING_EFFORT", "medium" if evidence else "low"))
+
+
+def _create_gemini_generator(*, evidence: bool) -> GeminiGenerationProvider:
+    try:
+        timeout = float(os.getenv("GEMINI_INFERENCE_TIMEOUT_SECONDS", "120"))
+    except ValueError:
+        raise ValueError("Gemini inference timeout configuration is invalid") from None
+    return GeminiGenerationProvider(
+        api_key=os.getenv("GEMINI_API_KEY", ""),
+        model=os.getenv("GEMINI_EVIDENCE_MODEL" if evidence else "GEMINI_GENERATION_MODEL",
+                        DEFAULT_GEMINI_INFERENCE_MODEL),
+        timeout=timeout, temperature=0.0 if evidence else 0.1,
+        max_output_tokens=320 if evidence else 220)
 
 
 def _create_cloudflare_generator(*, evidence: bool) -> CloudflareGenerationProvider:
@@ -180,15 +219,15 @@ def create_parser() -> argparse.ArgumentParser:
     ask_parser.add_argument("--index-file", type=Path, default=DEFAULT_INDEX)
     ask_parser.add_argument(
         "--generation-provider",
-        choices=("ollama", "cloudflare"),
-        default=os.getenv("KNOWVIA_GENERATION_PROVIDER", "ollama"),
-        help="Generation provider (default: ollama)",
+        choices=("ollama", "cloudflare", "gemini", "groq"),
+        default=os.getenv("KNOWVIA_GENERATION_PROVIDER", "groq"),
+        help="Generation provider (default: groq; optional local alternative: ollama)",
     )
     ask_parser.add_argument(
         "--evidence-evaluator",
-        choices=("ollama", "cloudflare"),
-        default=os.getenv("KNOWVIA_EVIDENCE_EVALUATOR", "ollama"),
-        help="Evidence-sufficiency evaluator (default: ollama)",
+        choices=("ollama", "cloudflare", "gemini", "groq"),
+        default=os.getenv("KNOWVIA_EVIDENCE_EVALUATOR", "groq"),
+        help="Evidence-sufficiency evaluator (default: groq)",
     )
     ask_parser.add_argument(
         "--debug", action="store_true", help="Show structured developer-oriented output"
@@ -201,13 +240,13 @@ def create_parser() -> argparse.ArgumentParser:
     agent_parser.add_argument("--index-file", type=Path, default=DEFAULT_INDEX)
     agent_parser.add_argument(
         "--generation-provider",
-        choices=("ollama", "cloudflare"),
-        default=os.getenv("KNOWVIA_GENERATION_PROVIDER", "ollama"),
+        choices=("ollama", "cloudflare", "gemini", "groq"),
+        default=os.getenv("KNOWVIA_GENERATION_PROVIDER", "groq"),
     )
     agent_parser.add_argument(
         "--evidence-evaluator",
-        choices=("ollama", "cloudflare"),
-        default=os.getenv("KNOWVIA_EVIDENCE_EVALUATOR", "ollama"),
+        choices=("ollama", "cloudflare", "gemini", "groq"),
+        default=os.getenv("KNOWVIA_EVIDENCE_EVALUATOR", "groq"),
     )
     agent_parser.add_argument(
         "--router", choices=("deterministic", "gemini"),

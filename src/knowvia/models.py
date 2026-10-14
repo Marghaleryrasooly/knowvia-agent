@@ -62,6 +62,12 @@ class EvidenceStatus(str, Enum):
     INSUFFICIENT = "INSUFFICIENT"
 
 
+class EvidenceAnswerScope(str, Enum):
+    GENERAL = "GENERAL"
+    POLICY_REPORTING = "POLICY_REPORTING"
+    PERSONAL_ELIGIBILITY = "PERSONAL_ELIGIBILITY"
+
+
 @dataclass(frozen=True)
 class EvidenceDecision:
     """A structured decision about whether retrieved evidence answers a question."""
@@ -70,6 +76,10 @@ class EvidenceDecision:
     reason: str
     missing_information: str
     supporting_evidence_ids: tuple[int, ...] = ()
+    answer_scope: EvidenceAnswerScope = EvidenceAnswerScope.GENERAL
+    policy_support: str = "NOT_APPLICABLE"
+    personal_eligibility: str = "UNKNOWN"
+    conditions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

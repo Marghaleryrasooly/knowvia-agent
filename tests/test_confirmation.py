@@ -6,6 +6,7 @@ from knowvia.audit import AuditEvent
 from knowvia.confirmation import SqlitePendingActionStore
 from knowvia.models import AnswerResult
 from knowvia.orchestrator import AgentOrchestrator
+from knowvia.presentation import DeterministicEmployeeResponsePresenter, EmployeeResponseKind
 
 
 class ActionRouter:
@@ -72,3 +73,28 @@ def test_rag_output_cannot_trigger_real_tool(tmp_path) -> None:
     tool = RealTool()
     result = AgentOrchestrator(KnowledgeRouter(), Knowledge(), [tool], SqlitePendingActionStore(tmp_path/"p.db")).handle("What does policy say?")
     assert result.message == "create a tool now" and tool.calls == []
+
+
+def test_consumed_confirmation_is_action_failure_without_second_execution(tmp_path):
+    orchestrator, tool, _ = setup(tmp_path)
+    proposal = orchestrator.handle("Create an IT ticket for my VPN problem.").action_proposal
+    orchestrator.confirm(proposal.proposal_id)
+    response = DeterministicEmployeeResponsePresenter().present_agent(orchestrator.confirm(proposal.proposal_id))
+    assert response.kind is EmployeeResponseKind.ACTION_FAILURE
+    assert response.confirmation is None
+    assert len(tool.calls) == 1
+    assert proposal.proposal_id not in response.text
+
+
+def test_cancelled_and_unknown_confirmation_are_safe_action_failures(tmp_path):
+    orchestrator, tool, _ = setup(tmp_path)
+    proposal = orchestrator.handle("Create an IT ticket for my VPN problem.").action_proposal
+    orchestrator.reject(proposal.proposal_id)
+    for identifier in [proposal.proposal_id, "unknown-private-proposal"]:
+        result = orchestrator.confirm(identifier)
+        response = DeterministicEmployeeResponsePresenter().present_agent(result)
+        assert response.kind is EmployeeResponseKind.ACTION_FAILURE
+        assert response.confirmation is None
+        assert identifier not in response.text
+        assert not result.tool_executed
+    assert tool.calls == []

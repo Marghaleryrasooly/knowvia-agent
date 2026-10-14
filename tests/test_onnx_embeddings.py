@@ -63,8 +63,8 @@ def test_explicit_selection_preserves_local_default(monkeypatch):
 
 def test_invalid_embedding_configuration_fails_closed():
     from knowvia.deployment import DeploymentConfig, DeploymentConfigurationError
-    assert DeploymentConfig.from_environment({}).embedding_provider == "local"
-    assert DeploymentConfig.from_environment({"KNOWVIA_EMBEDDING_PROVIDER": "onnx"}).embedding_provider == "onnx"
+    assert DeploymentConfig.from_environment({"GROQ_API_KEY": "fictional"}).embedding_provider == "local"
+    assert DeploymentConfig.from_environment({"KNOWVIA_EMBEDDING_PROVIDER": "onnx", "GROQ_API_KEY": "fictional"}).embedding_provider == "onnx"
     with pytest.raises(DeploymentConfigurationError):
         DeploymentConfig.from_environment({"KNOWVIA_EMBEDDING_PROVIDER": "unknown"})
 

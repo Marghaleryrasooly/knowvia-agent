@@ -278,6 +278,8 @@ class RegistrationService:
             )
         except EmployeeVerificationError as error:
             raise RegistrationError("Registration could not be completed") from error
+        if any(permission.startswith("admin.") for permission in verified.identity.permissions):
+            raise RegistrationError("Privileged accounts require private provisioning")
         password_hash = self.password_hashes.hash(request.password)
         account = self.accounts.create(
             verified.employee.employee_id,
