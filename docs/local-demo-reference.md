@@ -1,11 +1,16 @@
-# Knowvia thesis demo guide
+# Historical local demonstration reference
 
-This sequence demonstrates employee usefulness and the safety boundaries built
-across M1–M13. For a fully repeatable presentation, start with the deterministic
-router and mock ticket backend. Use `employee-001` unless a scenario says
-otherwise.
+This guide preserves an early development walkthrough across internal milestones
+M1–M13. Its identity-selector workflow is not authentication and must not be used
+as current public setup. Current demonstrations sign in with privately provisioned
+accounts. Follow the [README](../README.md), [administration guide](administration.md)
+and [secure HTTPS guide](tailscale-demo.md) instead.
 
-## Before the demo
+The bundled index does not need rebuilding for normal startup. The historical
+commands below are reference material, not instructions to run against a working
+deployment. Never enable development identity overrides on the public website.
+
+## Historical local setup (not the current authenticated workflow)
 
 ```powershell
 .venv\Scripts\python.exe -m knowvia.cli index
@@ -17,7 +22,7 @@ $env:KNOWVIA_IDENTITY = "employee-001"
 
 Open `http://127.0.0.1:8000` and start a new conversation.
 
-## Recommended sequence
+## Example demonstration scenarios
 
 1. **Grounded HR answer** — Ask `How many vacation days do I get?` Show the
    concise answer and the Annual Leave source card.

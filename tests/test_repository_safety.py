@@ -29,7 +29,7 @@ def test_repository_ignore_contract_protects_local_state_and_keeps_source() -> N
 
     publishable = (
         ".env.example", "src/knowvia/web.py", "tests/test_web.py", "README.md",
-        "docs/DEMO_GUIDE.md", "src/knowvia/static/app.js",
+        "docs/local-demo-reference.md", "src/knowvia/static/app.js",
         "knowvia_m1_dataset/01_employee_handbook.md", "data/knowvia_index.json",
     )
     for value in publishable:

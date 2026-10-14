@@ -1,16 +1,20 @@
-# Wednesday university demo: publication and hosting
+# Historical hosting research and deployment alternatives
 
-The selected deadline approach is now [persistent local hosting with Tailscale
-Funnel](tailscale-demo.md). The Render recipe below is a historical, inactive
-alternative; its resettable storage was not approved.
+This document preserves hosting research from October 13, 2026. It is not the
+current deployment guide. Use [Tailscale HTTPS operations](tailscale-demo.md) for
+the running public demonstration, Groq defaults and persistent Windows storage.
+Provider/pricing observations below are historical, not current service guarantees.
+The Render recipe remains inactive; its resettable storage was not approved.
 
-Prepared October 13, 2026. **Not deployed; Groq is not accepted as default.**
+At the time of this research, Groq acceptance was incomplete. It has since been
+accepted as the default; the HTTPS demonstration has been activated through Funnel.
 `render.yaml` is an inactive recipe, using JSON syntax (valid YAML). Creating a
 Blueprint starts an initial deployment even with auto-deploy off. Do not create
-it before the gates below pass. Local Ollama defaults and the real `.env` remain
-unchanged. No credentials or usable accounts are included in the recipe.
+it as an alternative deployment without a separate review of persistence and safety.
+Earlier Ollama-default notes describe the research state, not the current application.
+No credentials or usable accounts are included in the recipe.
 
-## Recommended temporary cloud option
+## Previously considered temporary cloud option (not selected)
 
 One Render **Free** Docker service: existing Starlette/static frontend, ONNX
 MiniLM, unchanged JSON index, Gemini routing and explicitly configured Groq.
@@ -65,7 +69,7 @@ terminal. University-provided hosting is a possible $0 option only if those
 resources are supplied. The existing local HTTPS tunnel is a temporary fallback
 requiring the laptop to stay online. Neither is an independently verified free
 cloud entitlement. PostgreSQL would require an application migration and would
-not by itself persist uploaded document/version files; it is not a deadline shortcut.
+not by itself persist uploaded document/version files; it is not a persistence shortcut.
 
 ## Mandatory gates
 

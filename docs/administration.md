@@ -1,4 +1,4 @@
-# Administration foundation
+# Administration and trusted account management
 
 The `/admin` dashboard supplies account administration using existing APIs. Existing
 employee login, password hashing and cookies are reused. No public bootstrap,
@@ -65,8 +65,9 @@ verify eligibility. Invalid scoped outputs get at most the existing one repair;
 they cannot use legacy permission recovery to bypass required scope. Existing
 valid INSUFFICIENT decisions remain insufficient.
 
-Live model quality remains unaccepted until authorized scoped regression tests
-pass. Do not switch Ollama defaults or enable Groq globally based on offline tests.
+Groq GPT-OSS 120B is the current default evidence and answer provider following
+the completed acceptance run and focused condition-validation verification.
+Gemini routing is independent; Ollama remains an explicitly selected local alternative.
 
 ## Dashboard
 
@@ -89,7 +90,13 @@ are marked no-store. User-controlled metadata is rendered using textContent,
 not HTML. Mutation requests use same-origin JSON fetch; the browser supplies
 Origin and the existing server check rejects missing or mismatched origins.
 
-Knowledge uploads, password reset/invitation delivery, arbitrary permission-catalog
-editing and an employee-side admin navigation button are not added in this milestone.
+Knowledge management is implemented in the admin dashboard: administrators stage
+Markdown uploads, replace/remove documents, assign explicit skill and source-access
+roles, publish validated indexes atomically, inspect version history and roll back
+to a previous published version. New documents are not automatically available
+to every employee. See [knowledge management](admin-knowledge-management.md).
+
+Password reset/invitation delivery and arbitrary permission-catalog editing are
+not implemented. Public self-registration is disabled in the secure Funnel profile.
 Privately distribute initial credentials through an appropriate channel; they are
 never returned in account listings or administrative activity.

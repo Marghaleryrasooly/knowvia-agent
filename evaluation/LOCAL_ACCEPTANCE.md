@@ -1,5 +1,14 @@
 # Local acceptance reference
 
+> Historical context: the opening reference procedure documents the original
+> Ollama baseline, not current application defaults. Knowvia now defaults to Groq
+> evidence/answer inference; the evaluation CLI retains its explicit reference
+> candidate selection. Later sections describe optional candidates and safeguards.
+> Statements that code/providers were unchanged apply to that original measurement,
+> not every subsequent development stage. Use [the evaluation index](README.md)
+> for dataset purposes and the main README for current setup. Historical methodology,
+> questions, grading and saved results are preserved below.
+
 This is measurement, not a production quality approval. Application code,
 prompts, providers, the existing 40-case benchmark and index are unchanged.
 

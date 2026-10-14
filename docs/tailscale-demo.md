@@ -1,19 +1,26 @@
 # Persistent Windows HTTPS demonstration
 
-Prepared October 13, 2026; acceptance completed October 14. These commands
-are prepared, **not executed to start/expose the server**. The launcher changes
-only its child-process configuration; the real `.env` is unchanged and normal
-inference defaults now use Groq. `--groq-accepted` is an operator acknowledgement, not proof that
-acceptance passed. Never use it before formal review.
+The public deployment was activated and tested on October 14, 2026 at
+[https://desktop-md6j59m.taild8d8ea.ts.net/](https://desktop-md6j59m.taild8d8ea.ts.net/).
+The project owner verified the website and real Groq-backed responses through HTTPS.
+This records successful testing, not a continuous-availability guarantee.
 
-## Existing setup and previous failure evidence
+The Windows host runs both Knowvia and Tailscale Funnel. The computer must stay
+awake and connected, and both processes must remain running. Local SQLite state,
+uploaded knowledge and publication versions remain on persistent private disk.
+Public self-registration is intentionally disabled; administrators provision accounts.
+
+The launcher changes only its child-process configuration; the real `.env` is
+unchanged. Groq is the default inference provider. `--groq-accepted` acknowledges
+the completed acceptance review; it is not itself a model-quality test.
+
+## Host setup and historical investigation
 
 Tailscale 1.102.4 is installed at `C:\Program Files\Tailscale\tailscale.exe`.
-Read-only elevated status reports Running/online and hostname
-`desktop-md6j59m.taild8d8ea.ts.net`. No Serve/Funnel configuration currently
-exists. Local `/health` on port 8000 was unavailable during inspection.
-No previous Funnel startup script or request-correlated deployment log was found
-in the project. Do not read/share Tailscale state files: they can contain secrets.
+The configured hostname is `desktop-md6j59m.taild8d8ea.ts.net`.
+The initial preparation inspection found no active Funnel configuration or local
+health response; those observations predate successful activation and do not
+describe current availability. Do not read/share Tailscale state files: they can contain secrets.
 
 The saved original local acceptance artifact used Gemini routing, Ollama evidence
 and answers, local MiniLM and disabled structured output. Its natural VPN case
@@ -55,7 +62,7 @@ Set-Location D:\marghalery\knowvia-agent
 .venv\Scripts\python.exe -B deploy\funnel_start.py --hostname desktop-md6j59m.taild8d8ea.ts.net --check-only
 ```
 
-After Groq acceptance and separate startup/public-activation approval, terminal A:
+For a future authorized start (do not start a duplicate server while it is running), terminal A:
 
 ```powershell
 .venv\Scripts\python.exe -B deploy\funnel_start.py --hostname desktop-md6j59m.taild8d8ea.ts.net --port 8000 --groq-accepted

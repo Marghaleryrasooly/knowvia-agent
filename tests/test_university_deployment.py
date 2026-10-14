@@ -100,7 +100,7 @@ def test_recipe_reuses_existing_image_entrypoint_and_onnx_build_switch():
 
 
 def test_documentation_discloses_reset_bootstrap_and_memory_gates():
-    text = (PROJECT_ROOT / "docs/university-deployment.md").read_text(encoding="utf-8")
+    text = (PROJECT_ROOT / "docs/hosting-options-history.md").read_text(encoding="utf-8")
     assert "resettable" in text and "no shell" in text
     assert "cannot bootstrap an admin" in text
     assert "not** a Linux" in text and "knowledge/versions/" in text
