@@ -920,11 +920,11 @@ def create_web_app(
         try:
             parsed = urlsplit(origin)
         except ValueError:
-            return JSONResponse({"error": "Administrative request origin rejected."}, status_code=403)
+            return JSONResponse({"error": "Administrative request origin rejected.", "code": "ORIGIN_REJECTED"}, status_code=403)
         if (parsed.scheme != request.url.scheme or parsed.netloc != request.url.netloc
                 or parsed.path or parsed.query or parsed.fragment
                 or request.headers.get("content-type", "").split(";")[0].strip() != "application/json"):
-            return JSONResponse({"error": "Administrative request origin rejected."}, status_code=403)
+            return JSONResponse({"error": "Administrative request origin rejected.", "code": "ORIGIN_REJECTED"}, status_code=403)
         try:
             if request.url.path.startswith("/api/admin/knowledge/"):
                 # Bound the body before decoding; Markdown is data, never HTML.
@@ -964,7 +964,11 @@ def create_web_app(
                 employee = EmployeeRecord(*(body[k] for k in ("employee_id", "first_name", "last_name", "work_email", "department", "role")))
                 await run_in_threadpool(authority.provision, actor, employee, body["password"], body["password_confirmation"], body["roles"])
             return JSONResponse({"updated": True})
-        except Exception:
+        except Exception as error:
+            from knowvia.admin import AdministrativeIdentityConflict
+            if isinstance(error, AdministrativeIdentityConflict):
+                return JSONResponse({"error": "Employee ID or work email already exists. Existing records were not changed.",
+                                     "code": "IDENTITY_CONFLICT"}, status_code=400)
             return JSONResponse({"error": "Administrative change could not be completed."}, status_code=400)
 
     async def chat(request: Request):

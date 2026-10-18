@@ -35,6 +35,10 @@ class AdministrationError(ValueError):
     """Safe category, never stored credentials or SQL errors."""
 
 
+class AdministrativeIdentityConflict(AdministrationError):
+    """An existing identity cannot be adopted or overwritten by provisioning."""
+
+
 class SqliteAuthority:
     """One trusted authority and transaction coordinator for administration.
 
@@ -168,10 +172,17 @@ class SqliteAuthority:
 
     @staticmethod
     def _insert_employee(db, employee, hashed):
-        db.execute("INSERT INTO directory.employee_directory VALUES (?, ?, ?, ?, ?, ?, ?)",
-                   (employee.employee_id, employee.first_name, employee.last_name, employee.work_email, employee.department, employee.role, int(employee.active)))
-        db.execute("INSERT INTO account.accounts VALUES (?, ?, ?, ?, ?, ?)",
-                   (uuid4().hex, employee.employee_id, employee.work_email, hashed, datetime.now(timezone.utc).isoformat(), "ACTIVE" if employee.active else "DISABLED"))
+        try:
+            db.execute("INSERT INTO directory.employee_directory VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       (employee.employee_id, employee.first_name, employee.last_name, employee.work_email, employee.department, employee.role, int(employee.active)))
+            db.execute("INSERT INTO account.accounts VALUES (?, ?, ?, ?, ?, ?)",
+                       (uuid4().hex, employee.employee_id, employee.work_email, hashed, datetime.now(timezone.utc).isoformat(), "ACTIVE" if employee.active else "DISABLED"))
+        except sqlite3.IntegrityError as error:
+            if getattr(error, "sqlite_errorcode", None) in {
+                sqlite3.SQLITE_CONSTRAINT_UNIQUE, sqlite3.SQLITE_CONSTRAINT_PRIMARYKEY,
+            }:
+                raise AdministrativeIdentityConflict("Employee identity already exists") from None
+            raise
 
     def provision(self, actor, employee: EmployeeRecord, password, confirmation, roles):
         roles = self._roles(roles)

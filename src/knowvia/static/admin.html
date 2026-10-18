@@ -5,46 +5,84 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Knowvia secure administration">
   <title>Knowvia — Administration</title>
-  <link rel="stylesheet" href="/static/admin.css?v=2">
-  <script src="/static/admin.js?v=2" defer></script>
+  <link rel="stylesheet" href="/static/admin.css?v=5">
+  <script src="/static/admin.js?v=5" defer></script>
 </head>
-<body>
+<body class="login-mode">
   <header class="header"><a class="brand" href="/admin">Knowvia <span>Administration</span></a><nav aria-label="Workspace navigation"><a href="/">Employee workspace</a><button id="logout" hidden>Sign out</button></nav></header>
   <main>
-    <p id="notice" role="status" aria-live="polite">Checking your session…</p>
+    <div id="notification" class="notification" hidden><span id="notice-symbol" aria-hidden="true"></span><p id="notice" role="status" aria-live="polite" aria-atomic="true"></p><button id="notice-dismiss" type="button" aria-label="Dismiss notification">×</button></div>
     <section id="login-section" class="panel login" hidden>
       <p class="eyebrow">SECURE ADMINISTRATOR ACCESS</p><h1>Sign in to administration</h1>
-      <p>Use your existing administrator account. Administrator access is provisioned privately, not through public registration.</p>
-      <form id="login-form"><label>Work email<input name="work_email" type="email" autocomplete="username" maxlength="254" required></label><label>Password<input name="password" type="password" autocomplete="current-password" required></label><button class="primary" type="submit">Sign in</button></form>
+      <p class="login-intro">Use your existing administrator account. Administrator access is provisioned privately, not through public registration.</p>
+      <form id="login-form"><label>Work email<input name="work_email" type="email" autocomplete="username" maxlength="254" required></label><label>Password<span class="login-password-field"><input id="admin-password" name="password" type="password" autocomplete="current-password" required><button id="admin-password-toggle" type="button" aria-label="Show password" aria-controls="admin-password" aria-pressed="false">Show</button></span></label><button class="primary" type="submit">Sign in</button></form>
     </section>
-    <div id="dashboard" hidden>
-      <div class="heading"><div><p class="eyebrow">NOVATECH WORKSPACE</p><h1>Account administration</h1><p id="administrator"></p></div><button id="refresh">Refresh accounts and activity</button></div>
-      <nav class="sections" aria-label="Administration sections"><a href="#accounts-section">Employee accounts</a><a href="#provision-section">Provision employee</a><a href="#knowledge-section">Company knowledge</a><a href="#activity-section">Administrative activity</a></nav>
-      <section id="accounts-section"><h2>Employee accounts</h2><p class="muted">Job titles are display information. Access comes only from the trusted roles below.</p><div id="accounts" class="accounts"></div></section>
-      <section id="provision-section" class="panel"><h2>Provision an employee</h2><p class="muted">Create a new directory record and account together. Existing directory-only employees use the existing employee registration flow; they are not overwritten here.</p>
-        <form id="provision-form" class="provision">
-          <label>Employee ID<input name="employee_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" required></label>
-          <label>Work email<input name="work_email" type="email" maxlength="254" autocomplete="off" required></label>
-          <label>First name<input name="first_name" maxlength="120" required></label><label>Last name<input name="last_name" maxlength="120" required></label>
-          <label>Department<input name="department" maxlength="120" required></label><label>Job title (not permissions)<input name="role" maxlength="120" required></label>
-          <label>Initial password<input name="password" type="password" autocomplete="new-password" required></label><label>Confirm initial password<input name="password_confirmation" type="password" autocomplete="new-password" required></label>
-          <fieldset class="wide"><legend>Trusted access roles</legend><div id="provision-roles" class="roles"></div></fieldset>
-          <div class="wide"><button class="primary" type="submit">Create employee account</button></div>
-        </form>
-      </section>
-      <section id="knowledge-section" class="panel"><h2>Company knowledge</h2>
-        <p class="muted">Markdown changes are staged, not immediately visible to employees. Each document requires explicit reading roles and a domain permission. Publishing builds and validates a complete runtime index; reference resources are never overwritten.</p>
-        <p id="knowledge-status" aria-live="polite"></p><div id="documents" class="accounts"></div>
-        <form id="knowledge-form" class="provision">
-          <label>Markdown file (upload or replace)<input id="knowledge-file" type="file" accept=".md,text/markdown" required></label>
-          <label>Knowledge domain<select id="knowledge-skill"><option value="hr">Human resources</option><option value="it_support">IT support</option><option value="finance">Finance</option></select></label>
-          <fieldset class="wide"><legend>Explicit document reading roles</legend><div id="knowledge-roles" class="roles"></div></fieldset>
-          <div class="wide"><button type="submit">Stage document</button></div>
-        </form>
-        <div class="account-actions knowledge-actions"><button id="knowledge-publish" class="primary">Publish validated index</button><button id="knowledge-discard">Discard staged changes</button><button id="knowledge-rollback">Roll back previous version</button></div>
-      </section>
-      <section id="activity-section" class="panel"><h2>Administrative activity</h2><p class="muted">Latest 100 sanitized administrative changes. This does not expose conversations, session tokens or unrestricted application logs.</p><ol id="activity" class="activity"></ol></section>
+    <div id="dashboard" class="admin-layout" hidden>
+      <button id="menu-toggle" class="menu-toggle" aria-controls="admin-navigation" aria-expanded="false">Administration menu</button>
+      <aside id="admin-navigation" class="admin-sidebar" aria-label="Administration navigation">
+        <p class="eyebrow">NOVATECH WORKSPACE</p>
+        <nav aria-label="Administration sections">
+          <button data-view="overview" aria-current="page"><svg aria-hidden="true" class="nav-icon" viewBox="0 0 24 24"><path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z"/></svg>Overview</button>
+          <button data-view="employees"><svg aria-hidden="true" class="nav-icon" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3"/><path d="M3 21v-3a6 6 0 0 1 12 0v3M16 4a3 3 0 0 1 0 6M18 13a5 5 0 0 1 3 5v3"/></svg>Employees</button>
+          <button data-view="add"><svg aria-hidden="true" class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M7 12h10"/></svg>Add employee</button>
+          <button data-view="knowledge"><svg aria-hidden="true" class="nav-icon" viewBox="0 0 24 24"><path d="M3 4h7l2 2 2-2h7v16h-7l-2 1-2-1H3zM12 6v15"/></svg>Company knowledge</button>
+          <button data-view="activity"><svg aria-hidden="true" class="nav-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></svg>Administrative activity</button>
+        </nav>
+        <p class="sidebar-note">Access is enforced by the server. Job titles do not grant permissions.</p>
+      </aside>
+      <div class="admin-content">
+        <div class="heading"><div><p id="administrator" class="muted"></p><h1 id="view-title" tabindex="-1">Overview</h1></div><button id="refresh">Refresh dashboard</button></div>
+        <section data-panel="overview" aria-label="Overview">
+          <p class="intro">Manage employee access and company knowledge from one trusted workspace.</p>
+          <div class="summary-grid">
+            <article class="panel summary"><span>Active accounts</span><strong id="summary-active">—</strong><small>Registered and active</small></article>
+            <article class="panel summary"><span>No sign-in account</span><strong id="summary-unregistered">—</strong><small>Directory records only</small></article>
+            <article class="panel summary"><span>Knowledge documents</span><strong id="summary-documents">—</strong><small id="summary-publication">Current document set</small></article>
+            <article class="panel summary"><span>Recent activity</span><strong id="summary-activity">—</strong><small>Latest 100 recorded events at most</small></article>
+          </div>
+          <div class="panel"><h2>Management shortcuts</h2><div class="shortcuts"><button data-view="add" class="primary">Add employee</button><button data-view="employees">Manage access</button><button data-view="knowledge">Manage company knowledge</button></div><p class="muted">Document changes remain staged until publication. Deactivation revokes sessions without deleting history.</p></div>
+        </section>
+        <section id="accounts-section" data-panel="employees" hidden>
+          <div class="section-heading"><p class="intro">Review accounts and trusted access. Open an editor only when you need to change roles.</p><button data-view="add" class="primary">Add employee</button></div>
+          <div class="table-wrap panel"><table class="employee-table"><caption class="sr-only">Employee accounts and management actions</caption><thead><tr><th scope="col">Employee</th><th scope="col">Department</th><th scope="col">Status</th><th scope="col">Trusted roles</th><th scope="col">Actions</th></tr></thead><tbody id="accounts"></tbody></table></div>
+        </section>
+        <section id="provision-section" data-panel="add" hidden>
+          <div class="panel form-panel"><h2>Create an employee account</h2><p class="muted">Create a new directory record and sign-in account together. Existing directory-only identities cannot be overwritten here. Public registration is disabled in the secure deployment; those records require a separately supported registration workflow.</p>
+            <form id="provision-form" class="provision">
+              <label>Employee ID<input name="employee_id" maxlength="128" pattern="[A-Za-z0-9][A-Za-z0-9_.-]*" aria-describedby="identity-hint" required></label>
+              <label>Work email<input name="work_email" type="email" maxlength="254" autocomplete="off" required></label>
+              <p id="identity-hint" class="hint wide">Use a unique ID and email. IDs may contain letters, numbers, dots, underscores and hyphens.</p>
+              <label>First name<input name="first_name" maxlength="120" required></label><label>Last name<input name="last_name" maxlength="120" required></label>
+              <label>Department<input name="department" maxlength="120" required></label><label>Job title<input name="role" maxlength="120" aria-describedby="job-title-hint" required></label>
+              <p id="job-title-hint" class="hint wide">Job titles are display information only; trusted roles below determine permissions.</p>
+              <label>Initial password<input name="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" aria-describedby="password-hint" required></label><label>Confirm initial password<input name="password_confirmation" type="password" minlength="12" maxlength="128" autocomplete="new-password" required></label>
+              <p id="password-hint" class="hint wide">Use 12–128 characters and share credentials privately. Passwords must match and are cleared after an attempted submission.</p>
+              <fieldset class="wide"><legend>Trusted access roles</legend><p class="hint">Select at least one role. The basic employee role alone does not grant knowledge access. Grant only the reading and ticket permissions this employee needs.</p><div id="provision-roles" class="roles"></div></fieldset>
+              <p id="employee-form-error" class="form-error wide" role="alert"></p>
+              <div class="wide account-actions"><button class="primary" type="submit">Create employee account</button><button id="employee-clear" type="button">Clear form</button></div>
+            </form>
+          </div>
+        </section>
+        <section id="knowledge-section" data-panel="knowledge" hidden>
+          <div class="panel publication"><h2>Publication status</h2><p id="knowledge-status" aria-live="polite"></p><p class="hint">Staging does not change employee knowledge. Publishing validates a complete index. Rollback restores the previous published version.</p><div class="account-actions knowledge-actions"><button id="knowledge-publish" class="primary" aria-describedby="publication-help">Publish staged changes</button><button id="knowledge-discard" aria-describedby="publication-help">Discard staged changes</button><button id="knowledge-rollback" aria-describedby="rollback-help">Roll back previous version</button></div><p id="publication-help" class="hint"></p><p id="rollback-help" class="hint"></p></div>
+          <div class="panel"><h2>Knowledge documents</h2><p class="hint">This list shows staged documents when changes exist; otherwise it shows the active set.</p><div id="documents" class="document-list"></div></div>
+          <div class="panel form-panel"><h2>Upload or replace a document</h2><p class="muted">Markdown only, up to 128 KiB per file. A matching filename stages a replacement. A document requires a title, nonempty level-two sections and explicit reading roles.</p>
+            <form id="knowledge-form" class="provision">
+              <label>Markdown file<input id="knowledge-file" type="file" accept=".md,text/markdown" required></label>
+              <label>Knowledge domain<select id="knowledge-skill"><option value="hr">Human resources</option><option value="it_support">IT support</option><option value="finance">Finance</option></select></label>
+              <fieldset class="wide"><legend>Explicit document reading roles</legend><div id="knowledge-roles" class="roles"></div></fieldset>
+              <div class="wide"><button type="submit">Stage document</button></div>
+            </form>
+          </div>
+        </section>
+        <section id="activity-section" data-panel="activity" hidden>
+          <div class="panel"><h2>Administrative activity</h2><p class="muted">Latest 100 sanitized administrative changes. No conversations, session tokens or unrestricted logs.</p><ol id="activity" class="activity"></ol></div>
+        </section>
+      </div>
     </div>
+    <dialog id="role-dialog" aria-labelledby="role-title" aria-describedby="role-help">
+      <form id="role-form"><div class="section-heading"><h2 id="role-title">Edit trusted roles</h2><button id="role-close" type="button" aria-label="Close role editor">Close</button></div><p id="role-help" class="muted">Roles determine access. Server-side authorization and last-administrator protection always apply.</p><div id="role-options" class="roles"></div><p id="role-notice" role="status" aria-live="polite"></p><div class="account-actions"><button type="submit" class="primary">Save roles</button><button id="role-cancel" type="button">Cancel</button></div></form>
+    </dialog>
   </main>
 </body>
 </html>
