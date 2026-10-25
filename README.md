@@ -211,6 +211,10 @@ resilience behavior; it does not bypass authorization or evidence validation.
 
 ## Running locally
 
+For the existing-account Windows launcher and explicit disposable review mode,
+see [safe local startup](docs/local-startup.md). Do not start a second main
+instance while the public Funnel deployment is running.
+
 For localhost HTTP, set `KNOWVIA_ENVIRONMENT=development` and
 `KNOWVIA_AUTH_COOKIE_SECURE=false` in private local configuration.
 Keep browser identity overrides disabled for authenticated demonstrations.
