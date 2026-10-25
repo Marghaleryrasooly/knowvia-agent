@@ -97,6 +97,8 @@ to a previous published version. New documents are not automatically available
 to every employee. See [knowledge management](admin-knowledge-management.md).
 
 Password reset/invitation delivery and arbitrary permission-catalog editing are
-not implemented. Public self-registration is disabled in the secure Funnel profile.
+not implemented in the web interface. Existing administrators have a
+[private local recovery procedure](admin-recovery.md), requiring explicit owner
+authorization and maintenance. Public self-registration is disabled in the secure Funnel profile.
 Privately distribute initial credentials through an appropriate channel; they are
 never returned in account listings or administrative activity.
