@@ -15,7 +15,8 @@ from knowvia.presentation import EmployeeResponse, EmployeeResponseKind, Employe
 from knowvia.skill_orchestration import SkillAgentResult
 from knowvia.skills import SkillSelectionStatus, SkillSelector, SkillSummary
 from knowvia.identity import IdentityContext
-from knowvia.action_intent import ExplicitCurrentTurnActionIntentPolicy
+from knowvia.action_intent import ExplicitCurrentTurnActionIntentPolicy, TicketRequestExtractor
+from knowvia.permissions import IdentityPermissionPolicy
 from knowvia.knowledge_normalization import (
     DeclarativeStatusAmbiguityPolicy,
     DeterministicKnowledgeRequestNormalizer,
@@ -606,10 +607,15 @@ class ResolvedRequest:
     inherited_skill_id: str | None = None
     clarification_question: str | None = None
     reason: str = ""
+    awaiting_ticket_details: bool = False
 
 
 class FollowUpResolver:
     """Resolves knowledge references without inheriting action or confirmation intent."""
+
+    # Server-authored marker in existing bounded turn storage; never a model field.
+    TICKET_DETAILS_PENDING = '[knowvia:awaiting-ticket-details:v1]'
+    TICKET_DETAILS_TTL_SECONDS = 300
 
     _affirmative = re.compile(
         r"^\s*(?:yes|yes[, ]+please|please do|do it|go ahead|sure|ok(?:ay)?)[.! ]*\s*$",
@@ -649,16 +655,6 @@ class FollowUpResolver:
         r"(?:for\s+)?(?:that|this|it)\b",
         re.I,
     )
-    _direct_ticket_problem = (
-        re.compile(r"\bbecause\s+(.+)$", re.I),
-        re.compile(r"\bticket\s*:\s*(.+)$", re.I),
-        re.compile(r"\bticket\s+(?:for|about|regarding)\s+(.+)$", re.I),
-    )
-    _context_placeholder = re.compile(
-        r"^(?:me|myself|that|this|it|that problem|this problem|the problem|"
-        r"that issue|this issue|the issue)$",
-        re.I,
-    )
     _clear_repeated_it_problem = re.compile(
         r"\bkeeps?\s+(?:restarting|rebooting|crashing|freezing|disconnecting|"
         r"dropping|locking|shutting\s+down)\b",
@@ -689,10 +685,15 @@ class FollowUpResolver:
         employee_request: str,
         state: ConversationState,
         available_skills: tuple[SkillSummary, ...],
+        identity: IdentityContext | None = None,
+        now: datetime | None = None,
     ) -> ResolvedRequest:
         request = employee_request.strip()
         if not request:
             return self._clarify(employee_request, "What would you like Knowvia to help with?", "Empty follow-up.")
+        pending = self._resolve_ticket_details(request, state, identity, now, available_skills)
+        if pending is not None:
+            return pending
         if self._affirmative.fullmatch(request):
             return self._clarify(
                 employee_request,
@@ -789,6 +790,35 @@ class FollowUpResolver:
             reason="A bounded recent knowledge topic resolved the referential follow-up.",
         )
 
+    def _resolve_ticket_details(self, request, state, identity, now, available_skills):
+        if not state.turns or identity is None or state.subject_id != identity.subject_id:
+            return None
+        previous = state.turns[-1]
+        if (previous.outcome != EmployeeResponseKind.CLARIFICATION.value
+                or previous.resolved_request != self.TICKET_DETAILS_PENDING
+                or previous.selected_skill_id != 'it_support'
+                or not self.action_intent.is_explicit(previous.original_request, 'create_it_ticket')
+                or not IdentityPermissionPolicy().can_use_tool(identity, 'create_it_ticket')):
+            return None
+        age = ((now or datetime.now(timezone.utc)) - previous.created_at).total_seconds()
+        if not 0 <= age < self.TICKET_DETAILS_TTL_SECONDS:
+            return None
+        if re.fullmatch(r"\s*(?:cancel(?:\s+(?:it|the\s+ticket))?|never\s*mind|stop)[.!\s]*", request, re.I):
+            return self._clarify(request, 'Ticket preparation cancelled. No ticket was created.',
+                                 'The employee cancelled the pending ticket-details request.')
+        if self.action_intent.is_explicit(request, 'create_it_ticket'):
+            return None  # A new explicit request must stand on its own details.
+        selection = self.selector.select(request, available_skills)
+        problem = TicketRequestExtractor.problem(request)
+        it_details = (selection.status is SkillSelectionStatus.SELECTED and selection.skill_id == 'it_support')
+        it_details = it_details or (selection.status is SkillSelectionStatus.UNSUPPORTED
+                                    and bool(TicketRequestExtractor.technical_subject.search(request)))
+        if problem is None or not it_details:
+            return None  # Consumed after one answer/topic change; never scan older drafts.
+        return ResolvedRequest(request, f'Create an IT ticket because {problem}.', ResolutionStatus.READY,
+                               inherited_skill_id='it_support',
+                               reason='One immediate authenticated details answer completed an explicit ticket request; confirmation is still required.')
+
     def _resolve_problem_clarification(
         self,
         request: str,
@@ -878,16 +908,13 @@ class FollowUpResolver:
                 )
             return None
 
-        for pattern in self._direct_ticket_problem:
-            match = pattern.search(request)
-            if match:
-                supplied = match.group(1).strip(" .?!")
-                if supplied and not self._context_placeholder.fullmatch(supplied):
-                    return None
-                # A named ticket operation plus one bounded employee-authored
-                # problem can safely resolve this/that/it. Bare action forms
-                # such as "create one for that" still fail the tool-specific
-                # current-turn action-intent policy above.
+        status, problem = TicketRequestExtractor.extract(request)
+        if status == 'DETAILS':
+            return ResolvedRequest(request, request, ResolutionStatus.READY,
+                                   reason='Current-turn ticket details take precedence over history.')
+        if status == 'AMBIGUOUS':
+            return self._clarify(request, 'Which single IT problem should I include in the ticket?',
+                                 'Supplied current-turn details are uncertain; historical substitution is forbidden.')
 
         problems: list[str] = []
         action_boundary = {
@@ -906,6 +933,9 @@ class FollowUpResolver:
                 EmployeeResponseKind.ABSTENTION.value,
             }:
                 continue
+            if TicketRequestExtractor.competing(turn.original_request):
+                return self._clarify(request, 'Which single IT problem should I include in the ticket?',
+                                     'A recent turn contains competing problems; no target can be selected safely.')
             normalized = self.knowledge_normalizer.normalize(turn.original_request)
             if not (
                 normalized.normalization_applied
@@ -917,6 +947,7 @@ class FollowUpResolver:
                     and self._clear_it_problem_signal.search(turn.original_request)
                 )
                 or self._clear_repeated_it_problem.search(turn.original_request)
+                or TicketRequestExtractor.problem(turn.original_request)
             ):
                 continue
             problem = turn.original_request.strip(" .?!")
@@ -931,11 +962,10 @@ class FollowUpResolver:
                 problems.append(problem)
 
         if not problems:
-            return self._clarify(
-                request,
-                "What IT problem should I include in the ticket?",
-                "No clear recent employee-authored IT problem is available.",
-            )
+            return ResolvedRequest(request, request, ResolutionStatus.CLARIFY,
+                                   clarification_question='What IT problem should I include in the ticket?',
+                                   reason='No clear recent employee-authored IT problem is available.',
+                                   awaiting_ticket_details=True)
         if len(problems) != 1:
             return self._clarify(
                 request,
@@ -1012,7 +1042,8 @@ class ConversationCoordinator:
     ) -> ConversationResult:
         subject_id = identity.subject_id if identity else None
         state = self.store.load(session_id, subject_id)
-        resolved = self.resolver.resolve(employee_request, state, self.available_skills)
+        resolved = self.resolver.resolve(employee_request, state, self.available_skills,
+                                         identity=identity, now=self._now())
         if resolved.status is ResolutionStatus.CLARIFY:
             decision = AgentDecision(
                 AgentDecisionKind.CLARIFY,
@@ -1039,12 +1070,14 @@ class ConversationCoordinator:
             agent_result = skill_result.agent_result
             response = self.presenter.present_agent(agent_result)
 
+        pending_details = bool(resolved.awaiting_ticket_details and identity is not None
+                               and IdentityPermissionPolicy().can_use_tool(identity, 'create_it_ticket'))
         self.store.append(
             session_id,
             ConversationTurn(
                 original_request=employee_request.strip() or "(empty request)",
-                resolved_request=resolved.standalone_request,
-                selected_skill_id=(skill_result.selected_skill_id if skill_result else None),
+                resolved_request=(self.resolver.TICKET_DETAILS_PENDING if pending_details else resolved.standalone_request),
+                selected_skill_id=('it_support' if pending_details else skill_result.selected_skill_id if skill_result else None),
                 outcome=response.kind.value,
                 created_at=self._now(),
             ),

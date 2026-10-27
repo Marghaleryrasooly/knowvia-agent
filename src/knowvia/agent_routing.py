@@ -4,6 +4,7 @@ import re
 from typing import Protocol
 
 from knowvia.agent_models import AgentDecision, AgentDecisionKind
+from knowvia.action_intent import TicketRequestExtractor
 
 
 class AgentRoutingError(ValueError):
@@ -66,15 +67,6 @@ def validate_agent_decision(
 class DeterministicAgentRouter:
     """Small, auditable M5 router with conservative action detection."""
 
-    _ticket = re.compile(r"\b(?:(?:it|support|helpdesk)\s+)?ticket\b", re.I)
-    _ticket_action = re.compile(
-        r"\b(?:create|make|open|raise|file|submit|log)\b.{0,30}\b(?:(?:it|support|helpdesk)\s+)?ticket\b",
-        re.I,
-    )
-    _polite_ticket_action = re.compile(
-        r"\bcan\s+you\s+(?:please\s+)?(?:create|make|open|raise|file|submit|log)\b",
-        re.I,
-    )
     _knowledge_start = re.compile(
         r"^\s*(?:how|what|when|where|why|who|which|is|are|does|do|explain|tell me|summarize)\b",
         re.I,
@@ -102,17 +94,16 @@ class DeterministicAgentRouter:
                 reason="The employee explicitly framed the request as a knowledge question.",
             )
 
-        explicit_ticket_action = bool(
-            self._ticket.search(request)
-            and (self._ticket_action.search(request) or self._polite_ticket_action.search(request))
-        )
+        detail_status, problem = TicketRequestExtractor.extract(request)
+        explicit_ticket_action = detail_status != 'NONE'
         if explicit_ticket_action:
-            problem = self._extract_problem(request)
-            if not problem:
+            if detail_status != 'DETAILS':
                 return AgentDecision(
                     AgentDecisionKind.CLARIFY,
                     tool_name="create_it_ticket",
-                    clarification_question="What IT problem should I include in the ticket?",
+                    clarification_question=("Which single IT problem should I include in the ticket?"
+                                            if detail_status == 'AMBIGUOUS' else
+                                            "What IT problem should I include in the ticket?"),
                     reason="An IT ticket was requested, but its problem description is missing.",
                 )
             return AgentDecision(
@@ -138,19 +129,8 @@ class DeterministicAgentRouter:
 
     @staticmethod
     def _extract_problem(request: str) -> str | None:
-        patterns = (
-            r"\bbecause\s+(.+)$",
-            r"\b(?:ticket)\s+(?:for|about|regarding)\s+(.+)$",
-            r"\b(?:for|about|regarding)\s+(.+)$",
-            r"\bticket\s*:\s*(.+)$",
-        )
-        for pattern in patterns:
-            match = re.search(pattern, request, re.I)
-            if match:
-                value = match.group(1).strip(" .")
-                if value and value.lower() not in {"me", "myself", "it support"}:
-                    return value
-        return None
+        status, problem = TicketRequestExtractor.extract(request)
+        return problem if status == 'DETAILS' else None
 
     @staticmethod
     def _make_title(problem: str) -> str:
