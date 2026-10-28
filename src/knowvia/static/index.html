@@ -28,6 +28,7 @@
           <label><span>Password</span><div class="password-field"><input id="signin-password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required><button type="button" data-password-toggle="signin-password" aria-label="Show password">Show</button></div></label>
           <p class="auth-message" id="signin-message" role="status" aria-live="polite"></p>
           <button class="auth-submit" id="signin-submit" type="submit">Sign in</button>
+            <a href="/password">Forgot password?</a>
         </form>
         <form class="auth-form" id="register-form" hidden>
           <label><span>Employee ID</span><input id="register-employee-id" autocomplete="off" maxlength="128" required></label>
@@ -85,6 +86,7 @@
               <div class="profile-heading"><span class="avatar large" id="profile-popover-avatar"></span><div><strong id="profile-full-name"></strong><span id="profile-email"></span></div></div>
               <dl class="profile-details"><div><dt>Employee ID</dt><dd id="profile-employee-id"></dd></div><div><dt>Department</dt><dd id="profile-detail-department"></dd></div><div><dt>Role</dt><dd id="profile-role"></dd></div></dl>
               <button class="signout-button" id="signout-button">Sign out</button>
+                <a class="signout-button" href="/account">Password &amp; security</a>
             </div>
           </div>
         </div>

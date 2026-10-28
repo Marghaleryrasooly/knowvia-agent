@@ -210,6 +210,9 @@ class SqliteAuthority:
             db.execute("UPDATE account.accounts SET status = ? WHERE employee_id = ?", ("ACTIVE" if active else "DISABLED", target))
             if not active:
                 db.execute("UPDATE session.authenticated_sessions SET revoked_at = ? WHERE account_id = ? AND revoked_at IS NULL", (datetime.now(timezone.utc).isoformat(), account[0]))
+                if db.execute("SELECT 1 FROM sqlite_master WHERE name='credential_tokens'").fetchone():
+                    db.execute('UPDATE credential_tokens SET consumed_at=? WHERE account_id=? AND consumed_at IS NULL',
+                               (datetime.now(timezone.utc).isoformat(), account[0]))
             self._event(db, actor, target, "ACTIVATE" if active else "DEACTIVATE")
 
     def assign_roles(self, actor, target, roles):

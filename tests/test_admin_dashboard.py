@@ -66,7 +66,7 @@ def test_listing_uses_allowlisted_metadata_only_and_catalog_is_server_trusted(cl
     assert response.headers["cache-control"] == "no-store"
     values = response.json()["accounts"]
     assert {row["employee_id"] for row in values} == {"admin", "reader"}
-    allowed = {"employee_id", "first_name", "last_name", "work_email", "department", "role", "active", "account_status", "roles"}
+    allowed = {"employee_id", "first_name", "last_name", "work_email", "department", "role", "active", "account_status", "roles", "invitation_pending"}
     assert all(set(row) == allowed for row in values)
     encoded = json.dumps(values)
     assert PASSWORD not in encoded and "password" not in encoded and "token" not in encoded and "account_id" not in encoded

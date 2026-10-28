@@ -18,6 +18,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
+from starlette.background import BackgroundTask
 
 from knowvia.accounts import RegistrationError, RegistrationRequest, RegistrationService, SqliteAccountRepository
 from knowvia.authentication import AuthenticationError, AuthenticationService, LoginRequest, SqliteAuthenticatedSessionStore
@@ -695,6 +696,7 @@ def create_web_app(
     runtime_paths: RuntimePaths | None = None,
     admin_authority: SqliteAuthority | None = None,
     knowledge_manager: KnowledgeManagement | None = None,
+    password_manager=None,
 ) -> Starlette:
     load_dotenv()
     deployment = deployment_config or DeploymentConfig.from_environment()
@@ -707,6 +709,16 @@ def create_web_app(
     embedding_holder = {"value": None}
     embedding_lock = Lock()
     login_guard = LoginAbuseGuard()
+    password_guard = LoginAbuseGuard(limit=5, window=300)
+    password_holder = {'value': password_manager}
+
+    def current_passwords():
+        if password_holder['value'] is None:
+            from knowvia.password_mail import mail_from_environment
+            from knowvia.password_management import PasswordManagement
+            mail, origin = mail_from_environment()
+            password_holder['value'] = PasswordManagement(paths, mail, origin)
+        return password_holder['value']
 
     def current_authority():
         if authority_holder["value"] is None:
@@ -797,6 +809,91 @@ def create_web_app(
     async def admin_homepage(request: Request):
         # Public shell contains no administrative data; API authorization remains authoritative.
         return FileResponse(STATIC_ROOT / "admin.html", headers={"Cache-Control": "no-store"})
+
+    async def password_homepage(request: Request):
+        return FileResponse(STATIC_ROOT / 'password.html', headers={'Cache-Control':'no-store', 'Referrer-Policy':'no-referrer'})
+
+    async def password_endpoint(request: Request):
+        from urllib.parse import urlsplit
+        from knowvia.password_management import GENERIC_RESET_MESSAGE
+        from knowvia.password_mail import MailUnavailable
+        from knowvia.password_management import PasswordManagementUnavailable
+        from knowvia.password_management import connection as manager_connection
+        operation = request.url.path.rsplit('/', 1)[-1]
+        if request.method == 'POST':
+            try:
+                origin = urlsplit(request.headers.get('origin', ''))
+                if (origin.scheme != request.url.scheme or origin.netloc != request.url.netloc
+                        or origin.path or origin.query or origin.fragment
+                        or request.headers.get('content-type','').split(';')[0].strip() != 'application/json'):
+                    raise ValueError
+            except Exception:
+                return JSONResponse({'error':'Request origin rejected.', 'code':'ORIGIN_REJECTED'}, status_code=403)
+        try:
+            body = None
+            if request.method == 'POST':
+                payload = bytearray()
+                async for part in request.stream():
+                    payload.extend(part)
+                    if len(payload) > 2048: raise ValueError
+                body = json.loads(payload)
+                if not isinstance(body, dict): raise ValueError
+            client = request.client.host if request.client else 'unknown'
+            if operation == 'forgot':
+                from knowvia.employee_directory import normalize_work_email
+                try:
+                    if set(body) != {'work_email'}: raise ValueError
+                    email = normalize_work_email(body['work_email'])
+                except ValueError:
+                    email = None
+                # Invalid emails still consume the client limit but never reach
+                # delivery. Valid variants share the account lookup's identity.
+                if password_guard.allow('forgot:'+client, email or 'invalid-email') and email is not None:
+                    try:
+                        manager = current_passwords()
+                    except Exception:
+                        manager = None
+                    if manager is not None:
+                        return JSONResponse({'message':GENERIC_RESET_MESSAGE}, headers={'Cache-Control':'no-store'},
+                                            background=BackgroundTask(manager.request_reset, email))
+                return JSONResponse({'message':GENERIC_RESET_MESSAGE}, headers={'Cache-Control':'no-store'})
+            if operation == 'redeem':
+                import hashlib
+                purpose = body.get('purpose')
+                fields = {'token','purpose'} if purpose == 'verify' else {'token','purpose','password','password_confirmation'}
+                if set(body) != fields: raise ValueError
+                token_key = hashlib.sha256(str(body.get('token','')).encode()).hexdigest()
+                if not password_guard.allow('redeem:'+client, token_key):
+                    return JSONResponse({'error':'Please wait before trying again.'}, status_code=429)
+                await run_in_threadpool(current_passwords().redeem, body['token'], purpose, body.get('password'), body.get('password_confirmation'))
+                return JSONResponse({'completed':True}, headers={'Cache-Control':'no-store'})
+            token = request.cookies.get(auth_config.cookie_name)
+            try:
+                principal = await run_in_threadpool(current_authentication().authentication.resolve_principal, token)
+            except Exception:
+                return JSONResponse({'error':'Authentication required.'}, status_code=401)
+            manager = current_passwords()
+            if operation == 'status' and request.method == 'GET':
+                with manager_connection(manager.paths.data_dir) as db:
+                    manager._schema(db)
+                    row = db.execute('SELECT recovery_email,email_verified_at FROM credential_state WHERE account_id=?', (principal.account.account_id,)).fetchone()
+                return JSONResponse({'email_verified':bool(row and row['email_verified_at'] and row['recovery_email']==principal.account.work_email),
+                                     'email_delivery_enabled':bool(manager.mail.enabled)}, headers={'Cache-Control':'no-store'})
+            if not password_guard.allow(operation+':'+client, principal.account.account_id):
+                return JSONResponse({'error':'Please wait before trying again.'}, status_code=429)
+            if operation == 'verify-email':
+                if set(body) != {'current_password'}: raise ValueError
+                await run_in_threadpool(manager.request_verification, principal.account.account_id, body['current_password'])
+                return JSONResponse({'sent':True}, headers={'Cache-Control':'no-store'})
+            if operation != 'change' or set(body) != {'current_password','password','password_confirmation'}: raise ValueError
+            await run_in_threadpool(manager.change, principal.account.account_id, token, body['current_password'], body['password'], body['password_confirmation'])
+            response = JSONResponse({'changed':True, 'sign_in_required':True}, headers={'Cache-Control':'no-store'})
+            response.delete_cookie(auth_config.cookie_name, path='/', secure=auth_config.secure_cookie, httponly=True, samesite=auth_config.same_site)
+            return response
+        except (MailUnavailable, PasswordManagementUnavailable):
+            return JSONResponse({'error':'Password email or storage is not available. Contact the administrator.'}, status_code=503)
+        except Exception:
+            return JSONResponse({'error':'The request could not be completed. Links must be valid and unused; passwords must match and contain 12–128 characters.'}, status_code=400)
 
     async def config(request: Request):
         return JSONResponse({
@@ -905,6 +1002,14 @@ def create_web_app(
                     data = {"events": await run_in_threadpool(authority.events, actor)}
                 elif request.url.path.endswith("/accounts"):
                     data = {"accounts": await run_in_threadpool(authority.account_listing, actor)}
+                    # Optional additive metadata; pre-migration installations keep
+                    # existing account listing behavior and never migrate here.
+                    try:
+                        states = await run_in_threadpool(current_passwords().states)
+                        for item in data['accounts']:
+                            item['invitation_pending'] = states.get(item['employee_id'], False)
+                    except Exception:
+                        pass
                 elif request.url.path.endswith("/roles"):
                     data = {"roles": await run_in_threadpool(authority.role_catalog, actor)}
                 else:
@@ -952,6 +1057,20 @@ def create_web_app(
                 body = await request.json()
             if request.url.path.startswith("/api/admin/knowledge/"):
                 pass
+            elif request.url.path.endswith('/invite'):
+                fields = {'employee_id','first_name','last_name','work_email','department','role','roles'}
+                if set(body) != fields: raise AdministrationError('Invalid request')
+                if not password_guard.allow('invite:'+actor, body['work_email']):
+                    return JSONResponse({'error':'Please wait before sending more invitations.'}, status_code=429)
+                employee = EmployeeRecord(*(body[k] for k in ('employee_id','first_name','last_name','work_email','department','role')))
+                result = await run_in_threadpool(current_passwords().invite, authority, actor, employee, body['roles'])
+                return JSONResponse(result, status_code=201, headers={'Cache-Control':'no-store'})
+            elif request.url.path.endswith('/invitation'):
+                if body != {}: raise AdministrationError('Invalid request')
+                if not password_guard.allow('invite:'+actor, request.path_params['employee_id']):
+                    return JSONResponse({'error':'Please wait before resending.'}, status_code=429)
+                await run_in_threadpool(current_passwords().resend_invitation, authority, actor, request.path_params['employee_id'])
+                return JSONResponse({'sent':True}, headers={'Cache-Control':'no-store'})
             elif request.url.path.endswith("/activation"):
                 if set(body) != {"active"}: raise AdministrationError("Invalid request")
                 await run_in_threadpool(authority.set_active, actor, request.path_params["employee_id"], body["active"])
@@ -966,6 +1085,10 @@ def create_web_app(
             return JSONResponse({"updated": True})
         except Exception as error:
             from knowvia.admin import AdministrativeIdentityConflict
+            from knowvia.password_mail import MailUnavailable
+            from knowvia.password_management import PasswordManagementUnavailable
+            if isinstance(error, (MailUnavailable, PasswordManagementUnavailable)):
+                return JSONResponse({'error':'Email delivery or password-management storage is unavailable. Existing accounts were not overwritten.'}, status_code=503)
             if isinstance(error, AdministrativeIdentityConflict):
                 return JSONResponse({"error": "Employee ID or work email already exists. Existing records were not changed.",
                                      "code": "IDENTITY_CONFLICT"}, status_code=400)
@@ -1199,15 +1322,21 @@ def create_web_app(
         routes=[
             Route("/", homepage),
             Route("/admin", admin_homepage),
+            Route('/password', password_homepage),
+            Route('/account', password_homepage),
             Route("/health", health),
             Route("/api/config", config),
             Route("/api/auth/register", register, methods=["POST"]),
             Route("/api/auth/login", login, methods=["POST"]),
             Route("/api/auth/logout", logout, methods=["POST"]),
             Route("/api/auth/me", me),
+            Route('/api/auth/password/status', password_endpoint),
+            Route('/api/auth/password/{operation:str}', password_endpoint, methods=['POST']),
             Route("/api/admin/me", admin_endpoint),
             Route("/api/admin/audit", admin_endpoint),
             Route("/api/admin/accounts", admin_endpoint, methods=["GET", "POST"]),
+            Route('/api/admin/accounts/invite', admin_endpoint, methods=['POST']),
+            Route('/api/admin/accounts/{employee_id:str}/invitation', admin_endpoint, methods=['POST']),
             Route("/api/admin/roles", admin_endpoint),
             Route("/api/admin/accounts/{employee_id:str}/activation", admin_endpoint, methods=["POST"]),
             Route("/api/admin/accounts/{employee_id:str}/roles", admin_endpoint, methods=["POST"]),

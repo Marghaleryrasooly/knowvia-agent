@@ -96,8 +96,10 @@ roles, publish validated indexes atomically, inspect version history and roll ba
 to a previous published version. New documents are not automatically available
 to every employee. See [knowledge management](admin-knowledge-management.md).
 
-Password reset/invitation delivery and arbitrary permission-catalog editing are
-not implemented in the web interface. Existing administrators have a
+Password changes, invitations and verified-email recovery are available as
+described in [password management](password-management.md), after explicit schema
+initialization and email configuration. Arbitrary permission-catalog editing
+remains unavailable. Existing administrators have a
 [private local recovery procedure](admin-recovery.md), requiring explicit owner
 authorization and maintenance. Public self-registration is disabled in the secure Funnel profile.
 Privately distribute initial credentials through an appropriate channel; they are

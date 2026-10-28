@@ -4,6 +4,7 @@
   const views = {overview:"Overview",employees:"Employees",add:"Add employee",knowledge:"Company knowledge",activity:"Administrative activity"};
   let catalog = [], accounts = [], knowledge = null, epoch = 0, busy = false;
   let savedMessage = "", employeeDirty = false, knowledgeDirty = false, roleEmployee = null;
+  let savedKind = 'success';
   let authenticated = false, noticeTimer = null, noticeKind = "";
   let currentView = Object.hasOwn(views, location.hash.slice(1)) ? location.hash.slice(1) : "overview";
   const roleDrafts = new Map();
@@ -59,11 +60,13 @@
     $("role-options").replaceChildren();
     $("dashboard").hidden = true; $("login-section").hidden = false; $("logout").hidden = true;
     for (const id of ["accounts","activity","provision-roles","documents","knowledge-roles"]) $(id).replaceChildren();
-    $("provision-form").reset(); $("knowledge-form").reset(); $("knowledge-status").textContent = "";
+    $("provision-form").reset(); syncOnboarding(); $("knowledge-form").reset(); $("knowledge-status").textContent = "";
     $("administrator").textContent = ""; $("employee-form-error").textContent = "";
   }
   function mutationMessage(path, body) {
     if (path === "/api/admin/accounts") return "Employee account created successfully.";
+    if (path.endsWith('/invite')) return 'Employee account created and invitation email sent.';
+    if (path.endsWith('/invitation')) return 'Invitation email resent. Older links are no longer valid.';
     if (path.endsWith("/activation")) return body.active ? "Employee account reactivated. A new sign-in is required." : "Employee account deactivated. Existing sessions were revoked.";
     if (path.endsWith("/roles")) return "Employee roles updated.";
     const messages = {stage:"Document staged successfully. Not yet published.",remove:"Document removal staged, not published.",publish:"Knowledge changes published.",rollback:"Previous knowledge version restored.",discard:"Staged knowledge changes discarded."};
@@ -121,7 +124,10 @@
         : "Check the connection and try again when available.";
       throw new FeedbackError(operationLabel(path)+" could not be completed. "+advice, "REJECTED");
     }
-    if (body !== undefined) savedMessage = mutationMessage(path, body);
+      if (body !== undefined) {
+        savedMessage = mutationMessage(path, body);
+        if(data.saved && data.mail_sent===false){savedMessage='Employee account saved, but invitation email delivery failed. Do not create it again; use Resend invitation after checking delivery configuration.';savedKind='warning';}
+      }
     if(path==="/api/admin/me")authenticated=true;
     return data;
   }
@@ -138,6 +144,7 @@
     return wrap;
   }
   function accountStatus(account) {
+    if(account.invitation_pending && account.active && account.account_status==='ACTIVE')return ['Invitation pending','unregistered'];
     if (account.account_status === "NOT_REGISTERED") return account.active ? ["No sign-in account","unregistered"] : ["Inactive directory record","inactive"];
     return account.active && account.account_status === "ACTIVE" ? ["Active","active"] : ["Deactivated","deactivated"];
   }
@@ -156,6 +163,10 @@
       const edit = node("button", "Edit roles"); edit.type = "button";
       edit.addEventListener("click", () => openRoleEditor(account.employee_id)); actions.append(edit);
       if (account.account_status !== "NOT_REGISTERED") {
+        if(account.invitation_pending){
+          const resend=node('button','Resend invitation');resend.type='button';
+          resend.addEventListener('click',()=>perform(async()=>{await api('/api/admin/accounts/'+encodeURIComponent(account.employee_id)+'/invitation',{});return true;}));actions.append(resend);
+        }
         const enable = !account.active || account.account_status !== "ACTIVE";
         const action = node("button", enable ? "Reactivate" : "Deactivate", enable ? "" : "danger"); action.type = "button";
         action.addEventListener("click", () => perform(async () => {
@@ -265,7 +276,7 @@
   }
   async function perform(operation, reload = true) {
     if (busy) return;
-    busy=true;savedMessage="";controls();
+    busy=true;savedMessage="";savedKind='success';controls();
     try {
       const changed=await operation();
       if(changed===false)return;
@@ -277,7 +288,7 @@
           return;
         }
       }
-      notice(message,"success");
+      notice(message,savedKind);
     } catch(error){notice(readableError(error),"error");}
     finally{busy=false;controls();}
   }
@@ -311,7 +322,7 @@
   $("knowledge-form").addEventListener("change",()=>{knowledgeDirty=true;});
   $("employee-clear").addEventListener("click",()=>{
     if(employeeDirty && !window.confirm("Discard the unsaved employee form?"))return;
-    $("provision-form").reset();$("provision-roles").replaceChildren(roles(["employee"]));employeeDirty=false;$("employee-form-error").textContent="";
+    $("provision-form").reset();syncOnboarding();$("provision-roles").replaceChildren(roles(["employee"]));employeeDirty=false;$("employee-form-error").textContent="";
   });
   $("role-options").addEventListener("change",()=>roleDrafts.set(roleEmployee,selectedRoles($("role-options"))));
   $("role-cancel").addEventListener("click",cancelRoleEditor);$("role-close").addEventListener("click",cancelRoleEditor);
@@ -363,21 +374,32 @@
     event.preventDefault();const form=event.currentTarget;
     perform(async()=>{
       const body=Object.fromEntries(new FormData(form));body.roles=selectedRoles($("provision-roles"));
+      const invitation=body.onboarding==='invite';delete body.onboarding;
       try{
         if(!body.roles.length)throw new FeedbackError("Select at least one trusted role.");
-        if(body.password.length<12 || body.password.length>128)throw new FeedbackError("Use a password between 12 and 128 characters.");
-        if(body.password!==body.password_confirmation){
+        if(!invitation && (body.password.length<12 || body.password.length>128))throw new FeedbackError("Use a password between 12 and 128 characters.");
+        if(!invitation && body.password!==body.password_confirmation){
           form.elements.password_confirmation.setAttribute("aria-invalid","true");
           throw new FeedbackError("Passwords must match.");
         }
         if(["employee_id","work_email","first_name","last_name","department","role"].some(key=>!body[key]?.trim()))throw new FeedbackError("Complete every required employee field.");
-        await api("/api/admin/accounts",body);form.reset();employeeDirty=false;
+        if(invitation){delete body.password;delete body.password_confirmation;}
+        await api(invitation?'/api/admin/accounts/invite':"/api/admin/accounts",body);form.reset();syncOnboarding();employeeDirty=false;
         $("provision-roles").replaceChildren(roles(["employee"]));$("employee-form-error").textContent="";
       }catch(error){$("employee-form-error").textContent=readableError(error);throw error;}
       finally{form.elements.password.value = "";form.elements.password_confirmation.value="";}
       return true;
     });
   });
+  function syncOnboarding(){
+    const invite=$('onboarding-method').value==='invite';
+    for(const [name,id] of [['password','initial-password-label'],['password_confirmation','initial-confirmation-label']]){
+      const field=$('provision-form').elements[name];field.disabled=invite;field.required=!invite;
+      if(invite)field.value='';$(id).hidden=invite;
+    }
+    $('password-hint').hidden=invite;
+  }
+  $('onboarding-method').addEventListener('change',syncOnboarding);
   $("refresh").addEventListener("click",()=>perform(async()=>{await load();return true;},false));
   $("logout").addEventListener("click",()=>perform(async()=>{
     if((employeeDirty || roleDrafts.size || knowledgeDirty) && !window.confirm("Sign out and discard unsaved form changes?"))return false;

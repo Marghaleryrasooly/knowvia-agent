@@ -59,6 +59,20 @@ async function employeeForm(page, password='Synthetic-test-password!') {
     await form.locator(`[name="${key}"]`).fill(value);
 }
 const tests = [
+  ['invitation onboarding sends trusted roles without password fields',async browser=>{
+    const {page,state,context}=await fixture(browser);
+    await employeeForm(page);
+    await page.locator('#onboarding-method').selectOption('invite');
+    assert.equal(await page.locator('#provision-form [name=password]').isDisabled(),true);
+    await page.locator('#provision-roles input[value=it-reader]').check();
+    await page.locator('#provision-form button[type=submit]').click();
+    await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('invitation email sent'));
+    assert.equal(state.posts.length,1);
+    assert.equal(state.posts[0].path,'/api/admin/accounts/invite');
+    assert.deepEqual(state.posts[0].body.roles,['employee','it-reader']);
+    for(const key of ['password','password_confirmation','onboarding'])assert.equal(key in state.posts[0].body,false);
+    await context.close();
+  }],
   ['admin sign-in follows employee card and control conventions without registration',async browser=>{
     for(const width of [360,1280]){
       const reference=await fixture(browser,{width,employeeReference:true});const review=await fixture(browser,{width,initialStatus:401});

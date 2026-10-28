@@ -9,7 +9,7 @@
   <script src="/static/admin.js?v=5" defer></script>
 </head>
 <body class="login-mode">
-  <header class="header"><a class="brand" href="/admin">Knowvia <span>Administration</span></a><nav aria-label="Workspace navigation"><a href="/">Employee workspace</a><button id="logout" hidden>Sign out</button></nav></header>
+  <header class="header"><a class="brand" href="/admin">Knowvia <span>Administration</span></a><nav aria-label="Workspace navigation"><a href="/">Employee workspace</a><a href="/account">Password &amp; security</a><button id="logout" hidden>Sign out</button></nav></header>
   <main>
     <div id="notification" class="notification" hidden><span id="notice-symbol" aria-hidden="true"></span><p id="notice" role="status" aria-live="polite" aria-atomic="true"></p><button id="notice-dismiss" type="button" aria-label="Dismiss notification">×</button></div>
     <section id="login-section" class="panel login" hidden>
@@ -55,7 +55,9 @@
               <label>First name<input name="first_name" maxlength="120" required></label><label>Last name<input name="last_name" maxlength="120" required></label>
               <label>Department<input name="department" maxlength="120" required></label><label>Job title<input name="role" maxlength="120" aria-describedby="job-title-hint" required></label>
               <p id="job-title-hint" class="hint wide">Job titles are display information only; trusted roles below determine permissions.</p>
-              <label>Initial password<input name="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" aria-describedby="password-hint" required></label><label>Confirm initial password<input name="password_confirmation" type="password" minlength="12" maxlength="128" autocomplete="new-password" required></label>
+              <label class="wide">Onboarding method<select id="onboarding-method" name="onboarding"><option value="temporary">Administrator-created initial password</option><option value="invite">Email invitation — employee sets password</option></select></label>
+              <p class="hint wide">Email invitations require configured delivery and a real recipient address. Invitation links expire after 24 hours. Administrator invitations are not supported.</p>
+              <label id="initial-password-label">Initial password<input name="password" type="password" minlength="12" maxlength="128" autocomplete="new-password" aria-describedby="password-hint" required></label><label id="initial-confirmation-label">Confirm initial password<input name="password_confirmation" type="password" minlength="12" maxlength="128" autocomplete="new-password" required></label>
               <p id="password-hint" class="hint wide">Use 12–128 characters and share credentials privately. Passwords must match and are cleared after an attempted submission.</p>
               <fieldset class="wide"><legend>Trusted access roles</legend><p class="hint">Select at least one role. The basic employee role alone does not grant knowledge access. Grant only the reading and ticket permissions this employee needs.</p><div id="provision-roles" class="roles"></div></fieldset>
               <p id="employee-form-error" class="form-error wide" role="alert"></p>

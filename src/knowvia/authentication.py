@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Callable
 from uuid import uuid4
 
-from knowvia.accounts import Account, AccountRepository, AccountStatus, Argon2idPasswordHashService, PasswordHashService, PasswordPolicy
+from knowvia.accounts import Account, AccountRepository, AccountStatus, Argon2idPasswordHashService, PasswordHashService, PasswordPolicy, SqliteAccountRepository
 from knowvia.employee_directory import EmployeeDirectoryIdentityService, EmployeeVerificationError
 from knowvia.identity import IdentityContext
 
@@ -71,7 +71,7 @@ class SqliteAuthenticatedSessionStore:
         self._initialize()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path, timeout=10)
+        connection = sqlite3.connect(self.path, timeout=10, uri=True)
         connection.row_factory = sqlite3.Row
         return connection
 
@@ -88,7 +88,8 @@ class SqliteAuthenticatedSessionStore:
     def _digest(token: str) -> str:
         return hashlib.sha256(token.encode("ascii")).hexdigest()
 
-    def issue(self, account_id: str) -> IssuedSession:
+    def issue(self, account_id: str, *, credentials_path: Path | None = None,
+              expected_password_hash: str | None = None) -> IssuedSession:
         if not isinstance(account_id, str) or not account_id.strip():
             raise AuthenticationError("Authentication failed")
         token = self._token_factory(self.TOKEN_BYTES)
@@ -99,6 +100,14 @@ class SqliteAuthenticatedSessionStore:
             raise AuthenticationError("Authentication failed")
         session = AuthenticatedSession(uuid4().hex, account_id.strip(), created_at, created_at + self.lifetime, None)
         with closing(self._connect()) as connection:
+            if credentials_path is not None:
+                connection.execute('ATTACH DATABASE ? AS credentials',
+                                   (Path(credentials_path).resolve().as_uri() + '?mode=rw',))
+                connection.execute('BEGIN IMMEDIATE')
+                current = connection.execute('SELECT password_hash,status FROM credentials.accounts WHERE account_id=?', (session.account_id,)).fetchone()
+                if (current is None or current['status'] != AccountStatus.ACTIVE.value
+                        or current['password_hash'] != expected_password_hash):
+                    raise AuthenticationError('Authentication failed')
             connection.execute("INSERT INTO authenticated_sessions (token_digest, session_id, account_id, created_at, expires_at, revoked_at) VALUES (?, ?, ?, ?, ?, NULL)", (self._digest(token), session.session_id, session.account_id, session.created_at.isoformat(), session.expires_at.isoformat()))
             connection.commit()
         return IssuedSession(token, session)
@@ -154,7 +163,12 @@ class AuthenticationService:
         if credentials is None or not password_ok or credentials.account.status is not AccountStatus.ACTIVE:
             raise AuthenticationError("Authentication failed")
         principal = self._principal(credentials.account)
-        return LoginResult(principal, self.sessions.issue(credentials.account.account_id))
+        if isinstance(self.accounts, SqliteAccountRepository):
+            issued = self.sessions.issue(credentials.account.account_id, credentials_path=self.accounts.path,
+                                         expected_password_hash=credentials.password_hash)
+        else:
+            issued = self.sessions.issue(credentials.account.account_id)
+        return LoginResult(principal, issued)
 
     def resolve_principal(self, token: str) -> AuthenticatedPrincipal:
         session = self.sessions.resolve(token)
