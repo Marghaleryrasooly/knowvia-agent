@@ -37,11 +37,15 @@
   bind('change-form',async body=>{await api('change',body);$('account-section').hidden=true;feedback('Password changed. All previous sessions were signed out. Please sign in again.');});
   bind('verify-form',async body=>{await api('verify-email',body);feedback('Verification email sent. Open its link to confirm your recovery address.');});
   if(location.pathname==='/account') {
-    $('title').textContent='Password & security';
+    $('title').textContent='Password & Security';
     api('status').then(data=>{
       $('account-section').hidden=false;
       $('email-state').textContent=data.email_verified?'Recovery email verified.':'Recovery email is not yet verified.';
-      if(!data.email_delivery_enabled)feedback('Email delivery is disabled. You can still change your password. Contact the administrator for email recovery.');
+      $('email-badge').textContent=data.email_verified?'Verified':'Not verified';
+      $('email-badge').className='badge '+(data.email_verified?'verified':'warning');
+      $('mail-state').textContent=data.email_delivery_enabled?'Enabled':'Disabled';
+      $('mail-state').className='badge '+(data.email_delivery_enabled?'verified':'warning');
+      $('mail-notice').hidden=!!data.email_delivery_enabled;
     }).catch(error=>feedback(error.message,true));
   } else if(token && ['invite','reset','verify'].includes(purpose)) {
     $('title').textContent=purpose==='invite'?'Set your password':purpose==='reset'?'Reset your password':'Verify recovery email';

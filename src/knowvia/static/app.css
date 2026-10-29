@@ -105,6 +105,7 @@ body.sidebar-resizing{cursor:col-resize;user-select:none}
 .profile-heading{gap:9px;padding-bottom:10px}
 .profile-details{gap:6px;margin:10px 0}
 .signout-button{height:32px}
+.profile-security-action{display:flex;align-items:center;gap:10px;min-height:44px;margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;color:var(--ink);background:var(--canvas);text-decoration:none;font-size:12px;font-weight:500}.profile-security-action svg{width:18px;height:18px;flex-shrink:0;color:var(--accent)}.profile-security-action:hover{color:var(--hover);background:var(--tint);border-color:#c3d8e4;text-decoration:none}.profile-security-action:focus-visible{outline:3px solid var(--accent);outline-offset:3px;background:var(--tint)}.profile-action-arrow{margin-left:auto;color:var(--muted);font-size:18px}
 .notification-button svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .notification-menu{position:relative;flex:none}
 .notification-menu .notification-panel{position:absolute;top:calc(100% + 8px);right:0;width:min(330px,calc(100vw - 24px));max-height:none;overflow:hidden;padding:10px 12px;border-radius:11px;box-shadow:0 6px 20px rgba(35,47,62,.08);background:rgba(255,255,255,.97)}

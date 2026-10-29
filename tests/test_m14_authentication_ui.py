@@ -55,7 +55,8 @@ def test_profile_exposes_safe_employee_metadata_only() -> None:
     profile = html[html.index('id="profile-menu"'):html.index('</header>')]
     for label in ("Employee ID", "Department", "Role", "Sign out"):
         assert label in profile
-    assert 'href="/account">Password &amp; security</a>' in profile
+    assert 'class="profile-security-action" href="/account"' in profile
+    assert '<span>Password &amp; security</span>' in profile
     for forbidden in ("Permissions", "Session token", 'type="password"'):
         assert forbidden not in profile
 

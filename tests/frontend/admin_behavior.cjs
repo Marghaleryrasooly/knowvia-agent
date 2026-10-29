@@ -59,6 +59,17 @@ async function employeeForm(page, password='Synthetic-test-password!') {
     await form.locator(`[name="${key}"]`).fill(value);
 }
 const tests = [
+  ['employee security settings link has action-row geometry and keyboard focus',async browser=>{
+    const {page,context}=await fixture(browser,{employeeReference:true});
+    await page.evaluate(()=>{document.querySelector('#auth-screen').hidden=true;for(let node=document.querySelector('#profile-menu');node;node=node.parentElement)node.hidden=false;document.querySelector('#profile-popover').hidden=false;});
+    const action=page.locator('.profile-security-action');
+    assert.equal(await action.getAttribute('href'),'/account');
+    assert((await action.boundingBox()).height>=44);
+    await action.focus();
+    assert.notEqual(await action.evaluate(e=>getComputedStyle(e).outlineStyle),'none');
+    await action.hover();assert.equal(await action.evaluate(e=>getComputedStyle(e).display),'flex');
+    await context.close();
+  }],
   ['invitation onboarding sends trusted roles without password fields',async browser=>{
     const {page,state,context}=await fixture(browser);
     await employeeForm(page);
