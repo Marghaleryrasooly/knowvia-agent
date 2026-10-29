@@ -31,7 +31,7 @@
         <p class="sidebar-note">Access is enforced by the server. Job titles do not grant permissions.</p>
       </aside>
       <div class="admin-content">
-        <div class="heading"><div><p id="administrator" class="muted"></p><h1 id="view-title" tabindex="-1">Overview</h1></div><button id="refresh">Refresh dashboard</button></div>
+        <div class="heading"><div><p id="administrator" class="muted"></p><h1 id="view-title" tabindex="-1">Overview</h1></div><button id="refresh" class="management-button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m10-4a8 8 0 0 0-14-2m0 10a8 8 0 0 0 14 2"/></svg><span>Refresh dashboard</span></button></div>
         <section data-panel="overview" aria-label="Overview">
           <p class="intro">Manage employee access and company knowledge from one trusted workspace.</p>
           <div class="summary-grid">
@@ -40,11 +40,12 @@
             <article class="panel summary"><span>Knowledge documents</span><strong id="summary-documents">—</strong><small id="summary-publication">Current document set</small></article>
             <article class="panel summary"><span>Recent activity</span><strong id="summary-activity">—</strong><small>Latest 100 recorded events at most</small></article>
           </div>
-          <div class="panel"><h2>Management shortcuts</h2><div class="shortcuts"><button data-view="add" class="primary">Add employee</button><button data-view="employees">Manage access</button><button data-view="knowledge">Manage company knowledge</button></div><p class="muted">Document changes remain staged until publication. Deactivation revokes sessions without deleting history.</p></div>
+          <div class="panel"><h2>Management shortcuts</h2><div class="shortcuts"><button data-view="add" class="primary management-button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Add employee</span></button><button data-view="employees">Manage access</button><button data-view="knowledge">Manage company knowledge</button></div><p class="muted">Document changes remain staged until publication. Deactivation revokes sessions without deleting history.</p></div>
         </section>
         <section id="accounts-section" data-panel="employees" hidden>
-          <div class="section-heading"><p class="intro">Review accounts and trusted access. Open an editor only when you need to change roles.</p><button data-view="add" class="primary">Add employee</button></div>
-          <div class="table-wrap panel"><table class="employee-table"><caption class="sr-only">Employee accounts and management actions</caption><thead><tr><th scope="col">Employee</th><th scope="col">Department</th><th scope="col">Status</th><th scope="col">Trusted roles</th><th scope="col">Actions</th></tr></thead><tbody id="accounts"></tbody></table></div>
+          <div class="section-heading"><p class="intro">Review accounts and trusted access. Open an editor only when you need to change roles.</p><button data-view="add" class="primary management-button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg><span>Add employee</span></button></div>
+          <div class="table-wrap panel" role="region" aria-label="Employee accounts; scroll horizontally for more columns" tabindex="0"><table class="employee-table"><caption class="sr-only">Employee accounts and management actions</caption><thead><tr><th scope="col">Employee</th><th scope="col">Department</th><th scope="col">Status</th><th scope="col">Trusted roles</th><th scope="col">Actions</th></tr></thead><tbody id="accounts"></tbody></table></div>
+          <p class="table-scroll-hint">Scroll horizontally when needed to read all details. Row actions stay available on the right.</p>
         </section>
         <section id="provision-section" data-panel="add" hidden>
           <div class="panel form-panel"><h2>Create an employee account</h2><p class="muted">Create a new directory record and sign-in account together. Existing directory-only identities cannot be overwritten here. Public registration is disabled in the secure deployment; those records require a separately supported registration workflow.</p>
@@ -70,7 +71,7 @@
           <div class="panel"><h2>Knowledge documents</h2><p class="hint">This list shows staged documents when changes exist; otherwise it shows the active set.</p><div id="documents" class="document-list"></div></div>
           <div class="panel form-panel"><h2>Upload or replace a document</h2><p class="muted">Markdown only, up to 128 KiB per file. A matching filename stages a replacement. A document requires a title, nonempty level-two sections and explicit reading roles.</p>
             <form id="knowledge-form" class="provision">
-              <label>Markdown file<input id="knowledge-file" type="file" accept=".md,text/markdown" required></label>
+              <label class="file-field"><span id="knowledge-file-label">Markdown file</span><span class="upload-zone"><input id="knowledge-file" type="file" accept=".md,text/markdown" aria-labelledby="knowledge-file-label" aria-describedby="knowledge-file-help" required><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 16V4m-4 4 4-4 4 4M4 15v5h16v-5"/></svg><span id="knowledge-filename" class="selected-file" aria-live="polite" aria-atomic="true">No file chosen</span><span class="upload-choice" aria-hidden="true">Choose file</span><small id="knowledge-file-help">Markdown (.md) · Maximum 128 KiB · Choose again to replace</small></span></label>
               <label>Knowledge domain<select id="knowledge-skill"><option value="hr">Human resources</option><option value="it_support">IT support</option><option value="finance">Finance</option></select></label>
               <fieldset class="wide"><legend>Explicit document reading roles</legend><div id="knowledge-roles" class="roles"></div></fieldset>
               <div class="wide"><button type="submit">Stage document</button></div>

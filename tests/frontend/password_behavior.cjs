@@ -72,11 +72,34 @@ async function fixture(browser,url,width=1100,status={email_verified:false,email
       assert.equal(await f.page.locator('#mail-notice').isVisible(),true);
       assert.equal(await f.page.locator('#feedback').innerText(),'');
       assert(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      const formBounds=await f.page.locator('#change-form').boundingBox(),buttonBounds=await f.page.locator('#change-form button').boundingBox();
+      assert(formBounds.width<=540.5,'Change Password form remains compact');
+      const currentBounds=await f.page.locator('#change-form [name=current_password]').boundingBox();
+      const overviewBounds=await f.page.locator('.overview').boundingBox();
+      const changeSectionBounds=await f.page.locator('.settings-sections>.card').first().boundingBox();
+      const recoveryBounds=await f.page.locator('.recovery').boundingBox();
+      assert(changeSectionBounds.y>=overviewBounds.y+overviewBounds.height-1,'Change Password follows Security overview');
+      if(width>760){
+        assert(recoveryBounds.x>=changeSectionBounds.x+changeSectionBounds.width-1,'Recovery Email stays beside Change Password');
+      }else{
+        assert(recoveryBounds.y>=changeSectionBounds.y+changeSectionBounds.height-1,'Sections stack on mobile');
+      }
+      const newBounds=await f.page.locator('#change-form [name=password]').boundingBox();
+      const confirmBounds=await f.page.locator('#change-form [name=password_confirmation]').boundingBox();
+      assert(Math.abs(currentBounds.width-formBounds.width)<2,'Current Password fills the compact form');
+      assert.equal(currentBounds.height,newBounds.height);assert.equal(newBounds.height,confirmBounds.height);
+      if(width>520){assert(Math.abs(newBounds.y-confirmBounds.y)<2);assert(confirmBounds.x>newBounds.x);}
+      else{assert(confirmBounds.y>newBounds.y);assert(Math.abs(newBounds.width-formBounds.width)<2);}
+      assert(Math.abs(currentBounds.x-buttonBounds.x)<2,'Password action aligns to form input left edge');
+      const hintBounds=await f.page.locator('#change-hint').boundingBox();
+      assert(buttonBounds.y>=hintBounds.y+hintBounds.height && buttonBounds.y-hintBounds.y-hintBounds.height<=20,'Action follows password guidance without excessive whitespace');
+      assert.equal(await f.page.locator('#change-form .form-actions').evaluate(e=>getComputedStyle(e).paddingTop),'2px');
+      if(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR){fs.mkdirSync(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR,{recursive:true});await f.page.screenshot({path:path.join(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR,`password-alignment-${width}.png`),fullPage:true});}
       if(width===1280){
         assert((await f.page.locator('.security-shell').boundingBox()).width<=1040);
-        assert.equal(await f.page.locator('.overview').evaluate(e=>getComputedStyle(e).paddingTop),'20px');
-        assert.equal(await f.page.locator('.settings-sections').evaluate(e=>getComputedStyle(e).rowGap),'16px');
-        assert((await f.page.locator('.overview').boundingBox()).height<520);
+        assert(parseFloat(await f.page.locator('#title').evaluate(e=>getComputedStyle(e).fontSize))<=24);
+        assert((await f.page.locator('.overview').boundingBox()).height<180);
+        assert(Math.abs(formBounds.width-540)<1,'Desktop form uses its 540px maximum');
       }
       const input=f.page.locator('#change-form [name=current_password]');
       await input.focus();await f.page.keyboard.press('Tab');

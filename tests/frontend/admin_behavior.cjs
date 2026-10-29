@@ -8,9 +8,10 @@ const assets = path.join(root, 'src/knowvia/static');
 const roles = [{name:'employee',permissions:[]},{name:'hr-reader',permissions:['knowledge.hr.read']},
   {name:'it-reader',permissions:['knowledge.it.read']},{name:'administrator',permissions:['admin.accounts.manage']}];
 const account = {employee_id:'reader',first_name:'Test',last_name:'Reader',work_email:'reader@novatech.example',department:'IT',role:'Employee',active:true,account_status:'ACTIVE',roles:['employee']};
-async function fixture(browser, {width=1280, employeeReference=false, initialStatus=200, postStatus=200, postCode=null, refreshFails=false, holdPost=false, abortPost=false, malformedPost=false, rows=[account], knowledge={active_version:'reference',revision:'clean',staged:false,rollback_available:false,documents:[]}, events=[]}={}) {
+async function fixture(browser, {width=1280, nativeFallback=false, employeeReference=false, initialStatus=200, postStatus=200, postCode=null, refreshFails=false, holdPost=false, abortPost=false, malformedPost=false, rows=[account], knowledge={active_version:'reference',revision:'clean',staged:false,rollback_available:false,documents:[]}, events=[]}={}) {
   const context = await browser.newContext({viewport:{width,height:900}});
   const page = await context.newPage();
+  if(nativeFallback)await page.addInitScript(()=>{HTMLElement.prototype.showPopover=undefined;});
   const state = {posts:[],saved:false,failReads:false,sessionExpired:false,adminStatus:initialStatus};
   await page.route('**/*', async route => {
     const request = route.request(), url = new URL(request.url());
@@ -59,6 +60,77 @@ async function employeeForm(page, password='Synthetic-test-password!') {
     await form.locator(`[name="${key}"]`).fill(value);
 }
 const tests = [
+  ['native fallback preserves both select controls when enhancement is unavailable',async browser=>{
+    const {page,context}=await fixture(browser,{nativeFallback:true});await view(page,'add');
+    await page.locator('#onboarding-method').selectOption('invite');
+    assert.equal(await page.locator('#onboarding-method').isVisible(),true);
+    await view(page,'knowledge');await page.locator('#knowledge-skill').selectOption('it_support');
+    assert.equal(await page.locator('#knowledge-skill').inputValue(),'it_support');await context.close();
+  }],
+  ['restrained interaction states distinguish selection, preserve geometry and respect disabled controls',async browser=>{
+    for(const width of [360,1280]){
+      const {page,state,context}=await fixture(browser,{width,events:[{operation:'ASSIGN_ROLES',actor:'admin',target:'reader',timestamp:'2026-10-30T00:00:00Z',roles:'["employee"]'}]});
+      const stableHover=async locator=>{
+        await locator.scrollIntoViewIfNeeded();const before=await locator.boundingBox();
+        await locator.hover();await page.waitForTimeout(160);
+        assert.deepEqual(await locator.boundingBox(),before);
+        assert.equal(await locator.evaluate(e=>getComputedStyle(e).transform),'none');
+      };
+      if(width>760){
+        const selected=page.locator('.admin-sidebar [aria-current=page]');
+        const other=page.locator('.admin-sidebar [data-view=employees]');
+        await stableHover(other);
+        assert.notEqual(await other.evaluate(e=>getComputedStyle(e).backgroundColor),await selected.evaluate(e=>getComputedStyle(e).backgroundColor));
+      }
+      for(const [name,selector] of [['overview','.shortcuts button'],['employees','.employee-action'],['add','#provision-form button[type=submit]'],['knowledge','#knowledge-form button[type=submit]'],['activity','.activity summary']]){
+        await view(page,name);for(const control of await page.locator(selector).all())await stableHover(control);
+      }
+      await view(page,'knowledge');const disabled=page.locator('#knowledge-publish');
+      assert.equal(await disabled.isDisabled(),true);
+      const paint=locator=>locator.evaluate(e=>{const s=getComputedStyle(e);return [s.backgroundColor,s.borderColor,s.color]});
+      await page.mouse.move(0,0);await page.waitForTimeout(160);const before=await paint(disabled);
+      await disabled.hover({force:true});await page.waitForTimeout(160);
+      assert.deepEqual(await paint(disabled),before);
+      assert.equal(await disabled.evaluate(e=>getComputedStyle(e).cursor),'not-allowed');
+      await page.locator('#refresh').focus();await page.keyboard.press('Tab');
+      assert.notEqual(await page.locator(':focus').evaluate(e=>getComputedStyle(e).outlineStyle),'none');
+      assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      assert.equal(state.posts.length,0);await context.close();
+    }
+  }],
+  ['employee rows remain readable with long identities, multiple roles and quiet statuses',async browser=>{
+    const long={...account,first_name:'Alexandra-Catherine',last_name:'Ramirez-Worthington',work_email:'alexandra.ramirez.research-and-development@regional.novatech.example',roles:['employee','hr-reader','it-reader','finance-reader','ticket-requester']};
+    const rows=[long,{...account,employee_id:'inactive',active:false,account_status:'DISABLED'},
+      {...account,employee_id:'directory',account_status:'NOT_REGISTERED'},
+      {...account,employee_id:'inactive-directory',account_status:'NOT_REGISTERED',active:false}];
+    for(const width of [360,800,1280]){
+      const {page,state,context}=await fixture(browser,{width,rows});await view(page,'employees');
+      const table=page.locator('.employee-table'),wrapper=page.locator('#accounts-section .table-wrap');
+      assert.equal(await wrapper.getAttribute('tabindex'),'0');
+      const row=page.locator('#accounts tr').first();
+      assert.equal(await row.locator('.employee-email').textContent(),long.work_email);
+      assert.equal(await row.locator('.role-summary').textContent(),long.roles.join(', '));
+      for(const status of ['Active','Deactivated','No sign-in account','Inactive directory record'])assert(await table.getByText(status,{exact:true}).isVisible());
+      for(const badge of await table.locator('.badge').all()){
+        assert.equal(await badge.evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
+        assert.equal(await badge.evaluate(e=>getComputedStyle(e,'::before').width),'6px');
+      }
+      for(const button of await table.locator('button').all())assert((await button.boundingBox()).height>=40,'Employee action target must be at least 40px at width '+width);
+      await wrapper.focus();await page.keyboard.press('Tab');
+      assert.equal(await row.getByRole('button',{name:'Edit roles',exact:true}).evaluate(e=>e===document.activeElement),true);
+      assert.notEqual(await row.getByRole('button',{name:'Edit roles',exact:true}).evaluate(e=>getComputedStyle(e).outlineStyle),'none');
+      if(width>760){
+        assert.equal(await row.locator('.employee-email').evaluate(e=>getComputedStyle(e).whiteSpace),'nowrap');
+        const actions=await row.locator('.account-actions').boundingBox(),bounds=await wrapper.boundingBox();
+        assert(actions.x>=bounds.x && actions.x+actions.width<=bounds.x+bounds.width);
+        await wrapper.focus();await page.keyboard.press('ArrowRight');
+        await page.waitForFunction(()=>document.querySelector('#accounts-section .table-wrap').scrollLeft>0);
+      }
+      assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      if(process.env.KNOWVIA_LAYOUT_SCREENSHOT_DIR){fs.mkdirSync(process.env.KNOWVIA_LAYOUT_SCREENSHOT_DIR,{recursive:true});await wrapper.evaluate(e=>e.scrollLeft=0);await page.screenshot({path:path.join(process.env.KNOWVIA_LAYOUT_SCREENSHOT_DIR,`employees-${width}.png`),fullPage:true});}
+      assert.equal(state.posts.length,0);await context.close();
+    }
+  }],
   ['admin header navigation is consistent, responsive and keyboard accessible',async browser=>{
     for(const width of [360,768,1280]){
       const {page,state,context}=await fixture(browser,{width});
@@ -96,7 +168,7 @@ const tests = [
   ['invitation onboarding sends trusted roles without password fields',async browser=>{
     const {page,state,context}=await fixture(browser);
     await employeeForm(page);
-    await page.locator('#onboarding-method').selectOption('invite');
+    await page.locator('#onboarding-method-trigger').click();await page.locator('#onboarding-method-option-1').click();
     assert.equal(await page.locator('#provision-form [name=password]').isDisabled(),true);
     await page.locator('#provision-roles input[value=it-reader]').check();
     await page.locator('#provision-form button[type=submit]').click();
@@ -294,7 +366,11 @@ const tests = [
       {...account,employee_id:'directory',account_status:'NOT_REGISTERED'}, {...account,employee_id:'inactive-directory',account_status:'NOT_REGISTERED',active:false}];
     const {page,context}=await fixture(browser,{rows});await view(page,'employees');
     for(const text of ['Active','Deactivated','No sign-in account','Inactive directory record']) assert.equal(await page.locator('#accounts').getByText(text,{exact:true}).count(),1);
-    const color=await page.locator('.badge.active').evaluate(e=>getComputedStyle(e).color);assert.equal(color,'rgb(36, 96, 68)');
+    const status=page.locator('.badge.active');
+    const color=await status.evaluate(e=>getComputedStyle(e).color);assert.equal(color,'rgb(21, 128, 61)');
+    assert.equal(await status.evaluate(e=>getComputedStyle(e,'::before').backgroundColor),color);
+    assert.equal(await status.evaluate(e=>getComputedStyle(e).backgroundColor),'rgba(0, 0, 0, 0)');
+    assert.equal(await status.evaluate(e=>e.tagName),'SPAN');assert.equal(await status.getAttribute('tabindex'),null);
     assert.equal(await page.locator('#accounts button').filter({hasText:'Delete'}).count(),0);await context.close();
   }],
   ['activation has confirmation and operation-specific feedback',async browser=>{
@@ -304,13 +380,69 @@ const tests = [
     await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('sessions were revoked'));
     assert.deepEqual(state.posts[0],{path:'/api/admin/accounts/reader/activation',body:{active:false}});await context.close();
   }],
+  ['native selects and accessible upload remain usable on desktop and mobile',async browser=>{
+    for(const width of [360,1280]){
+      const {page,state,context}=await fixture(browser,{width});await view(page,'add');
+      const onboarding=page.locator('[name=onboarding]'),trigger=page.locator('#onboarding-method-trigger');
+      await trigger.focus();await page.keyboard.press('Space');
+      assert.equal(await trigger.getAttribute('aria-expanded'),'true');
+      if(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR){fs.mkdirSync(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR,`onboarding-open-${width}.png`)});}
+      await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');await page.keyboard.press('Tab');
+      assert.equal(await onboarding.inputValue(),'invite');
+      await view(page,'knowledge');const select=page.locator('#knowledge-skill');
+      const domain=page.locator('#knowledge-skill-trigger');
+      assert.equal(await domain.evaluate(e=>Math.round(e.getBoundingClientRect().height)),44);
+      await domain.click();
+      assert.equal(await page.locator('#knowledge-skill-options').isVisible(),true);
+      assert.notEqual(await page.locator('#knowledge-skill-option-0').evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(0, 120, 215)');
+      if(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR,`domain-open-${width}.png`)});
+      await page.locator('#knowledge-skill-option-1').click();
+      assert.equal(await select.inputValue(),'it_support');
+      await domain.press('Enter');await domain.press('ArrowUp');await domain.press('Escape');assert.equal(await select.inputValue(),'it_support');
+      await domain.press('Enter');await domain.press('Tab');assert.equal(await domain.getAttribute('aria-expanded'),'false');
+      const input=page.locator('#knowledge-file');await input.focus();
+      await input.click({trial:true});await input.evaluate(e=>e.blur());await page.locator('.upload-zone').hover();
+      assert.equal(await page.locator('.upload-zone').evaluate(e=>getComputedStyle(e).outlineStyle),'none');
+      await domain.focus();await page.keyboard.press('Shift+Tab');await input.focus();
+      assert.notEqual(await page.locator('.upload-zone').evaluate(e=>getComputedStyle(e).outlineStyle),'none');
+      const chooserPromise=page.waitForEvent('filechooser');await input.press('Enter');const chooser=await chooserPromise;
+      await chooser.setFiles({name:'first.md',mimeType:'text/markdown',buffer:Buffer.from('# First')});
+      assert.equal(await page.locator('#knowledge-filename').innerText(),'first.md');
+      await input.setInputFiles({name:'replacement.md',mimeType:'text/markdown',buffer:Buffer.from('# Replacement')});
+      assert.equal(await page.locator('#knowledge-filename').innerText(),'replacement.md');
+      assert.equal(await input.getAttribute('accept'),'.md,text/markdown');
+      assert.match(await page.locator('#knowledge-file-help').innerText(),/128 KiB/);
+      if(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR)await page.screenshot({path:path.join(process.env.KNOWVIA_CONTROL_SCREENSHOT_DIR,`upload-${width}.png`),fullPage:true});
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+      assert.equal(state.posts.length,0);await context.close();
+    }
+  }],
+  ['upload validation rejects invalid files without staging and renders filenames as text',async browser=>{
+    const {page,state,context}=await fixture(browser);await view(page,'knowledge');
+    await page.locator('#knowledge-roles input[value=hr-reader]').check();
+    for(const file of [
+      {name:'invalid.txt',mimeType:'text/plain',buffer:Buffer.from('# Invalid')},
+      {name:'oversize.md',mimeType:'text/markdown',buffer:Buffer.alloc(131073,65)},
+      {name:'<img onerror=alert(1)>.md',mimeType:'text/markdown',buffer:Buffer.from('# Invalid name')}
+    ]){
+      await page.locator('#knowledge-file').setInputFiles(file);
+      assert.equal(await page.locator('#knowledge-filename').innerText(),file.name);
+      assert.equal(await page.locator('#knowledge-filename img').count(),0);
+      await page.locator('#knowledge-form button[type=submit]').click();
+      await page.waitForFunction(()=>document.querySelector('#notice').className==='error');
+      await page.waitForFunction(()=>document.querySelector('#dashboard').getAttribute('aria-busy')==='false');
+      assert.equal(state.posts.length,0);
+    }
+    await context.close();
+  }],
   ['knowledge drafts survive refresh; staging never automatically publishes',async browser=>{
     const {page,state,context}=await fixture(browser);await view(page,'knowledge');
     await page.locator('#knowledge-file').setInputFiles({name:'sample.md',mimeType:'text/markdown',buffer:Buffer.from('# Sample\n\n## Policy\nDocumented rule.')});
     await page.locator('#knowledge-roles input[value=hr-reader]').check();await view(page,'overview');await page.locator('#refresh').click();await view(page,'knowledge');
     assert.equal(await page.locator('#knowledge-file').evaluate(e=>e.files[0].name),'sample.md');assert.equal(await page.locator('#knowledge-roles input[value=hr-reader]').isChecked(),true);
     await page.locator('#knowledge-form button[type=submit]').click();await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('Not yet published'));
-    assert.equal(state.posts.length,1);assert.equal(state.posts[0].path,'/api/admin/knowledge/stage');assert.deepEqual(state.posts[0].body.roles,['hr-reader']);await context.close();
+    assert.equal(state.posts.length,1);assert.equal(state.posts[0].path,'/api/admin/knowledge/stage');assert.deepEqual(state.posts[0].body.roles,['hr-reader']);
+    await page.waitForFunction(()=>document.querySelector('#knowledge-filename').textContent==='No file chosen');await context.close();
   }],
   ['publication and rollback require explicit confirmation',async browser=>{
     const knowledge={active_version:'version-1',revision:'draft-2',staged:true,rollback_available:true,documents:[]};

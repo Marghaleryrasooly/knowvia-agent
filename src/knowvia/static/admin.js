@@ -1,6 +1,66 @@
 "use strict";
 (() => {
   const $ = id => document.getElementById(id);
+  // Progressive enhancement: retain the native select as the form authority.
+  function enhanceSelect(select) {
+    if (!HTMLElement.prototype.showPopover) return;
+    const button=document.createElement('button'), menu=document.createElement('div');
+    button.type='button';button.className='select-trigger';button.id=select.id+'-trigger';
+    button.setAttribute('role','combobox');button.setAttribute('aria-haspopup','listbox');
+    button.setAttribute('aria-expanded','false');button.setAttribute('aria-controls',select.id+'-options');
+    const label=select.closest('label');
+    const title=document.createElement('span');title.id=select.id+'-label';
+    title.textContent=label.firstChild.textContent.trim();label.firstChild.replaceWith(title);
+    button.setAttribute('aria-labelledby',title.id+' '+button.id);
+    menu.id=select.id+'-options';menu.className='select-menu';menu.popover='manual';
+    menu.setAttribute('role','listbox');menu.setAttribute('aria-labelledby',title.id);
+    let active=select.selectedIndex;
+    const options=Array.from(select.options, (option,index)=>{
+      const item=document.createElement('div');item.textContent=option.textContent;
+      item.id=select.id+'-option-'+index;item.setAttribute('role','option');
+      item.addEventListener('pointermove',()=>highlight(index));
+      item.addEventListener('mousedown',event=>event.preventDefault());
+      item.addEventListener('click',()=>choose(index));menu.append(item);return item;
+    });
+    function highlight(index){active=index;options.forEach((item,i)=>item.classList.toggle('highlighted',i===index));button.setAttribute('aria-activedescendant',options[index].id);}
+    function sync(){button.textContent=select.selectedOptions[0]?.textContent || '';options.forEach((item,i)=>item.setAttribute('aria-selected',String(i===select.selectedIndex)));}
+    function close(){menu.hidePopover();button.setAttribute('aria-expanded','false');button.removeAttribute('aria-activedescendant');}
+    function position(){
+      const rect=button.getBoundingClientRect();menu.style.width=rect.width+'px';menu.style.left=rect.left+'px';
+      const height=menu.getBoundingClientRect().height;
+      menu.style.top=(rect.bottom+height+8>innerHeight ? Math.max(8,rect.top-height-5) : rect.bottom+5)+'px';
+    }
+    function open(){
+      if(select.disabled || select.closest('[inert]'))return;
+      menu.showPopover();position();
+      button.setAttribute('aria-expanded','true');highlight(select.selectedIndex);
+    }
+    function choose(index){select.selectedIndex=index;sync();close();select.dispatchEvent(new Event('change',{bubbles:true}));button.focus();}
+    button.addEventListener('click',()=>button.getAttribute('aria-expanded')==='true'?close():open());
+    button.addEventListener('keydown',event=>{
+      const expanded=button.getAttribute('aria-expanded')==='true';
+      if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){
+        event.preventDefault();if(!expanded)open();
+        highlight(event.key==='Home'?0:event.key==='End'?options.length-1:Math.max(0,Math.min(options.length-1,active+(event.key==='ArrowDown'?1:-1))));
+      }else if(event.key==='Enter'||event.key===' '){event.preventDefault();expanded?choose(active):open();}
+      else if(event.key==='Escape'){event.preventDefault();close();}
+      else if(event.key==='Tab')close();
+    });
+    document.addEventListener('pointerdown',event=>{if(!button.contains(event.target)&&!menu.contains(event.target))close();});
+    window.addEventListener('resize',close);document.addEventListener('scroll',()=>{
+      if(button.getAttribute('aria-expanded')==='true')position();
+    },true);
+    select.addEventListener('change',sync);select.form?.addEventListener('reset',()=>queueMicrotask(()=>{sync();close();}));
+    label.append(button);document.body.append(menu);sync();select.classList.add('enhanced-select');select.tabIndex=-1;
+    // Failure before this point leaves the native control fully usable.
+  }
+  for(const id of ['onboarding-method','knowledge-skill']){
+    const select=$(id);
+    try{enhanceSelect(select);}catch(_){
+      $(id+'-trigger')?.remove();$(id+'-options')?.remove();
+      select.classList.remove('enhanced-select');select.removeAttribute('tabindex');
+    }
+  }
   const views = {overview:"Overview",employees:"Employees",add:"Add employee",knowledge:"Company knowledge",activity:"Administrative activity"};
   let catalog = [], accounts = [], knowledge = null, epoch = 0, busy = false;
   let savedMessage = "", employeeDirty = false, knowledgeDirty = false, roleEmployee = null;
@@ -155,20 +215,20 @@
     const fragment = document.createDocumentFragment();
     for (const account of accounts) {
       const row = node("tr"); row.dataset.employee = account.employee_id;
-      const identity = node("div");
-      identity.append(node("strong", account.first_name + " " + account.last_name), node("small", account.employee_id), node("small", account.work_email));
+      const identity = node("div", undefined, "employee-identity");
+      identity.append(node("strong", account.first_name + " " + account.last_name), node("small", account.employee_id), node("small", account.work_email, "employee-email"));
       const department = node("div", account.department); department.append(node("small", account.role));
       const [label, style] = accountStatus(account);
       const actions = node("div", undefined, "account-actions");
-      const edit = node("button", "Edit roles"); edit.type = "button";
+      const edit = node("button", "Edit roles", "employee-action"); edit.type = "button";
       edit.addEventListener("click", () => openRoleEditor(account.employee_id)); actions.append(edit);
       if (account.account_status !== "NOT_REGISTERED") {
         if(account.invitation_pending){
-          const resend=node('button','Resend invitation');resend.type='button';
+          const resend=node('button','Resend invitation','employee-action');resend.type='button';
           resend.addEventListener('click',()=>perform(async()=>{await api('/api/admin/accounts/'+encodeURIComponent(account.employee_id)+'/invitation',{});return true;}));actions.append(resend);
         }
         const enable = !account.active || account.account_status !== "ACTIVE";
-        const action = node("button", enable ? "Reactivate" : "Deactivate", enable ? "" : "danger"); action.type = "button";
+        const action = node("button", enable ? "Reactivate" : "Deactivate", enable ? "employee-action" : "employee-action danger"); action.type = "button";
         action.addEventListener("click", () => perform(async () => {
           if (!window.confirm((enable ? "Reactivate " : "Deactivate ") + account.employee_id + "?" + (enable ? " A new sign-in will be required." : " Existing sessions will be revoked. History will not be deleted."))) return false;
           await api("/api/admin/accounts/" + encodeURIComponent(account.employee_id) + "/activation", {active:enable});
@@ -176,7 +236,7 @@
         })); actions.append(action);
       } else actions.append(node("small", "No account to activate"));
       row.append(cell("Employee",identity),cell("Department",department),cell("Status",node("span",label,"badge "+style)),
-        cell("Trusted roles",node("div",account.roles.join(", ") || "No assigned roles")),cell("Actions",actions));
+        cell("Trusted roles",node("div",account.roles.join(", ") || "No assigned roles","role-summary")),cell("Actions",actions));
       fragment.append(row);
     }
     $("accounts").replaceChildren(fragment);
@@ -319,6 +379,11 @@
     $("provision-form").querySelectorAll("[aria-invalid]").forEach(input=>input.removeAttribute("aria-invalid"));
   });
   $("provision-form").addEventListener("change",()=>{employeeDirty=true;});
+  function showSelectedFile(){
+    $("knowledge-filename").textContent=$("knowledge-file").files[0]?.name || "No file chosen";
+  }
+  $("knowledge-file").addEventListener("change",showSelectedFile);
+  $("knowledge-form").addEventListener("reset",()=>queueMicrotask(showSelectedFile));
   $("knowledge-form").addEventListener("change",()=>{knowledgeDirty=true;});
   $("employee-clear").addEventListener("click",()=>{
     if(employeeDirty && !window.confirm("Discard the unsaved employee form?"))return;
