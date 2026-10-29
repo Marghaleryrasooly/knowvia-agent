@@ -72,6 +72,12 @@ async function fixture(browser,url,width=1100,status={email_verified:false,email
       assert.equal(await f.page.locator('#mail-notice').isVisible(),true);
       assert.equal(await f.page.locator('#feedback').innerText(),'');
       assert(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      if(width===1280){
+        assert((await f.page.locator('.security-shell').boundingBox()).width<=1040);
+        assert.equal(await f.page.locator('.overview').evaluate(e=>getComputedStyle(e).paddingTop),'20px');
+        assert.equal(await f.page.locator('.settings-sections').evaluate(e=>getComputedStyle(e).rowGap),'16px');
+        assert((await f.page.locator('.overview').boundingBox()).height<520);
+      }
       const input=f.page.locator('#change-form [name=current_password]');
       await input.focus();await f.page.keyboard.press('Tab');
       assert.equal(await f.page.locator('#change-form [name=password]').evaluate(e=>e===document.activeElement),true);

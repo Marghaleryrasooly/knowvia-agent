@@ -59,6 +59,29 @@ async function employeeForm(page, password='Synthetic-test-password!') {
     await form.locator(`[name="${key}"]`).fill(value);
 }
 const tests = [
+  ['admin header navigation is consistent, responsive and keyboard accessible',async browser=>{
+    for(const width of [360,768,1280]){
+      const {page,state,context}=await fixture(browser,{width});
+      const actions=page.locator('.header .header-action');assert.equal(await actions.count(),3);
+      assert.equal(await actions.nth(0).getAttribute('href'),'/');
+      assert.equal(await actions.nth(1).getAttribute('href'),'/account');
+      const heights=[];
+      for(let i=0;i<3;i++){
+        const action=actions.nth(i);heights.push((await action.boundingBox()).height);
+        assert.equal(await action.evaluate(e=>getComputedStyle(e).textDecorationLine),'none');
+        assert.equal(await action.evaluate(e=>getComputedStyle(e).fontSize),width<=640?'12px':'13px');
+        await action.focus();assert.notEqual(await action.evaluate(e=>getComputedStyle(e).outlineStyle),'none');
+      }
+      assert(heights.every(value=>value===40));
+      await actions.nth(0).focus();await page.keyboard.press('Tab');
+      assert.equal(await actions.nth(1).evaluate(e=>e===document.activeElement),true);
+      await page.keyboard.press('Tab');assert.equal(await actions.nth(2).evaluate(e=>e===document.activeElement),true);
+      assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      assert.equal(state.posts.length,0);
+      if(process.env.KNOWVIA_POLISH_SCREENSHOT_DIR){fs.mkdirSync(process.env.KNOWVIA_POLISH_SCREENSHOT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.KNOWVIA_POLISH_SCREENSHOT_DIR,`admin-header-${width}.png`)});}
+      await context.close();
+    }
+  }],
   ['employee security settings link has action-row geometry and keyboard focus',async browser=>{
     const {page,context}=await fixture(browser,{employeeReference:true});
     await page.evaluate(()=>{document.querySelector('#auth-screen').hidden=true;for(let node=document.querySelector('#profile-menu');node;node=node.parentElement)node.hidden=false;document.querySelector('#profile-popover').hidden=false;});
