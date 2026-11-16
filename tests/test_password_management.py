@@ -351,7 +351,8 @@ def test_malformed_emails_consume_client_budget_without_delivery(setup):
 
 
 @pytest.mark.parametrize('port',[465,587])
-def test_smtp_tls_and_sanitized_failure(monkeypatch,port):
+@pytest.mark.parametrize('purpose',['invite','reset','verify'])
+def test_smtp_tls_and_sanitized_failure(monkeypatch,port,purpose):
     from knowvia import password_mail
     events=[]
     class Client:
@@ -367,18 +368,60 @@ def test_smtp_tls_and_sanitized_failure(monkeypatch,port):
         def login(self,*args):events.append('login')
         def send_message(self,message):
             assert message['To']=='recipient@example.org'
+            assert message.get_content_type()=='multipart/alternative'
+            content=message.get_body(preferencelist=('plain',)).get_content()
+            assert 'https://knowvia.example/password#synthetic' in content
+            assert '24 hours' in content if purpose=='invite' else '30 minutes' in content
+            assert 'only once' in content
+            assert 'synthetic-secret' not in content
+            html=message.get_body(preferencelist=('html',)).get_content()
+            assert {'invite':'Create your password','reset':'Reset your password','verify':'Verify your email'}[purpose] in html
+            assert 'href="https://knowvia.example/password#synthetic"' in html
+            assert '<script' not in html and '<img' not in html
+            assert 'synthetic-secret' not in html
             events.append('send')
             return {}
     monkeypatch.setattr(password_mail.smtplib,'SMTP_SSL',Client)
     monkeypatch.setattr(password_mail.smtplib,'SMTP',Client)
     mail=password_mail.SmtpMail('smtp.example.org',port,'synthetic-user','synthetic-secret','sender@example.org')
-    mail.send('recipient@example.org','reset','https://knowvia.example/password#synthetic')
+    mail.send('recipient@example.org',purpose,'https://knowvia.example/password#synthetic')
     assert events==(['ehlo','tls','ehlo','login','send'] if port==587 else ['login','send'])
     def fail(self,message):raise RuntimeError('synthetic-secret sensitive response')
     monkeypatch.setattr(Client,'send_message',fail)
     with pytest.raises(MailUnavailable) as error:mail.send('recipient@example.org','reset','https://knowvia.example/password#synthetic')
     assert str(error.value)=='Email delivery could not be confirmed.'
     assert 'synthetic-secret' not in repr(mail)
+
+
+def test_html_mail_escapes_exact_callback_and_rejects_unsafe_urls(monkeypatch):
+    from html.parser import HTMLParser
+    from knowvia import password_mail
+    messages=[]
+    class Client:
+        def __init__(self,*args,**kwargs):pass
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def ehlo(self):pass
+        def starttls(self,context):pass
+        def login(self,*args):pass
+        def send_message(self,message):messages.append(message);return {}
+    monkeypatch.setattr(password_mail.smtplib,'SMTP',Client)
+    mail=password_mail.SmtpMail('smtp.example.org',587,'synthetic','synthetic','sender@example.org')
+    link='https://knowvia.example/password#purpose=invite&token="<tag>'
+    mail.send('recipient@example.org','invite',link)
+    message=messages[0];html=message.get_body(preferencelist=('html',)).get_content()
+    class Links(HTMLParser):
+        def __init__(self):super().__init__();self.links=[];self.tags=[]
+        def handle_starttag(self,tag,attrs):
+            self.tags.append(tag)
+            if tag=='a':self.links.append(dict(attrs).get('href'))
+    parsed=Links();parsed.feed(html)
+    assert parsed.links==[link]
+    assert 'tag' not in parsed.tags and 'script' not in parsed.tags and 'img' not in parsed.tags
+    assert link in message.get_body(preferencelist=('plain',)).get_content()
+    for unsafe in ['javascript:alert(1)','http://knowvia.example/password#synthetic','https://user:pass@knowvia.example/password#synthetic','https://knowvia.example/password?token=synthetic']:
+        with pytest.raises(MailUnavailable):mail.send('recipient@example.org','reset',unsafe)
+    assert len(messages)==1
 
 
 def test_schema_idempotence_restart_and_legacy_state(setup):

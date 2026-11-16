@@ -238,12 +238,20 @@ const tests = [
     assert.equal(await page.locator('#login-form [name=password]').inputValue(),'');assert.equal(state.posts.length,1);await context.close();
   }],
   ['success toast dismisses after 4.5 seconds without moving focus',async browser=>{
-    const {page,context}=await fixture(browser);await page.clock.install();await employeeForm(page);
+    const {page,state,context}=await fixture(browser);
+    // Freeze before the mutation: real assertion/transport latency must not consume
+    // the 4.5-second budget that this test advances explicitly.
+    await page.clock.install({time:new Date('2026-01-01T00:00:00Z')});
+    await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));await employeeForm(page);
     await page.locator('#provision-form button[type=submit]').click();await page.waitForFunction(()=>document.querySelector('#notice').textContent.includes('created successfully'));
     assert.equal(await page.locator('#notification').isVisible(),true);assert.equal(await page.locator('#notice').getAttribute('role'),'status');
     assert.equal(await page.locator('#notice-dismiss').evaluate(e=>e===document.activeElement),false);
-    await page.clock.fastForward(4400);assert.equal(await page.locator('#notification').isVisible(),true);
-    await page.clock.fastForward(200);assert.equal(await page.locator('#notification').isVisible(),false);await context.close();
+    const focused=await page.evaluateHandle(()=>document.activeElement);
+    await page.clock.fastForward(4499);assert.equal(await page.locator('#notification').isVisible(),true);
+    assert.equal(await focused.evaluate(e=>e===document.activeElement),true);
+    await page.clock.fastForward(1);assert.equal(await page.locator('#notification').isVisible(),false);
+    assert.equal(await focused.evaluate(e=>e===document.activeElement),true);
+    assert.equal(state.posts.length,1);await context.close();
   }],
   ['success clears on navigation and is not repeated by rendering',async browser=>{
     const {page,state,context}=await fixture(browser);await employeeForm(page);await page.locator('#provision-form button[type=submit]').click();

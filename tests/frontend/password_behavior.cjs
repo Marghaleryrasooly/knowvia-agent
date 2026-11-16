@@ -4,23 +4,27 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {chromium}=require('playwright');
 const assets=path.resolve(__dirname,'../../src/knowvia/static');
-async function fixture(browser,url,width=1100,status={email_verified:false,email_delivery_enabled:true},failure=false){
+async function fixture(browser,url,width=1100,status={email_verified:false,email_delivery_enabled:true},failure=false,options={}){
   const context=await browser.newContext({viewport:{width,height:900}});
-  const page=await context.newPage(), posts=[];
-  await page.route('**/*',route=>{
+  const page=await context.newPage(), posts=[],state={hold:!!options.hold};
+  await page.route('**/*',async route=>{
     const request=route.request(),parsed=new URL(request.url());
     assert.equal(parsed.hostname,'knowvia.test');
     if(['/password','/account'].includes(parsed.pathname))return route.fulfill({contentType:'text/html',body:fs.readFileSync(path.join(assets,'password.html'),'utf8')});
+    if(parsed.pathname==='/')return route.fulfill({contentType:'text/html',body:'<!doctype html><h1>Sign in</h1>'});
     if(parsed.pathname.startsWith('/static/'))return route.fulfill({contentType:parsed.pathname.endsWith('.js')?'text/javascript':'text/css',body:fs.readFileSync(path.join(assets,path.basename(parsed.pathname)),'utf8')});
     if(request.method()==='POST'){
       posts.push({path:parsed.pathname,body:request.postDataJSON()});
+      if(state.hold)await new Promise(resolve=>{state.release=resolve;});
+      if(options.abort)return route.abort('failed');
+      if(options.rateLimit)return route.fulfill({status:429,contentType:'application/json',body:JSON.stringify({error:'Please wait before trying again.'})});
       if(failure)return route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'The request could not be completed.'})});
       return route.fulfill({contentType:'application/json',body:JSON.stringify({completed:true,changed:true,sent:true,message:'Generic reset response.'})});
     }
     return route.fulfill({contentType:'application/json',body:JSON.stringify(status)});
   });
   await page.goto(url);
-  return {context,page,posts};
+  return {context,page,posts,state};
 }
 (async()=>{
   let browser;
@@ -41,12 +45,75 @@ async function fixture(browser,url,width=1100,status={email_verified:false,email
     assert.equal(f.posts.length,1);assert.equal(f.posts[0].body.token,token);
     assert.equal(await f.page.evaluate(()=>localStorage.length+sessionStorage.length),0);
     assert(!(await f.page.locator('body').innerText()).includes(token));
+    assert.equal(await f.page.locator('#success-title').innerText(),'Your account is ready. You can now sign in.');
+    assert.equal(await f.page.locator('#success-title').evaluate(e=>e===document.activeElement),true);
+    assert.equal(await f.page.locator('#success-section a').getAttribute('href'),'/');
+    await f.page.locator('#redeem-form').evaluate(e=>e.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+    assert.equal(f.posts.length,1,'Completed invitation cannot submit twice');
+    await f.page.locator('#success-section a').click();assert.equal(new URL(f.page.url()).pathname,'/');
+    assert(await f.page.getByRole('heading',{name:'Sign in',exact:true}).isVisible());assert.equal(f.posts.length,1);
     await f.context.close();
+    for(const width of [360,1280]){
+      f=await fixture(browser,'https://knowvia.test/password',width,undefined,false,{hold:true});
+      assert.equal(await f.page.getByLabel('Account email',{exact:true}).count(),1);
+      assert.match(await f.page.locator('#description').innerText(),/account email/);
+      await f.page.getByLabel('Account email',{exact:true}).fill('employee@example.org');
+      await f.page.locator('#forgot-form button').click();
+      await f.page.waitForFunction(()=>document.querySelector('#forgot-form').getAttribute('aria-busy')==='true');
+      assert.equal(await f.page.locator('#forgot-form button').isDisabled(),true);
+      assert.match(await f.page.locator('#forgot-form button').innerText(),/Requesting/);
+      await f.page.locator('#forgot-form').evaluate(e=>e.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})));
+      assert.equal(f.posts.length,1);f.state.release();
+      await f.page.waitForFunction(()=>document.querySelector('#forgot-form button').textContent==='Request another link');
+      assert.match(await f.page.locator('#forgot-followup').innerText(),/delivery is not guaranteed/);
+      assert.equal(await f.page.locator('#forgot-form button').isEnabled(),true);
+      assert(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+      if(process.env.KNOWVIA_ACCOUNT_UX_SCREENSHOT_DIR){fs.mkdirSync(process.env.KNOWVIA_ACCOUNT_UX_SCREENSHOT_DIR,{recursive:true});await f.page.screenshot({path:path.join(process.env.KNOWVIA_ACCOUNT_UX_SCREENSHOT_DIR,`forgot-${width}.png`),fullPage:true});}
+      f.state.hold=false;await f.page.locator('#forgot-form button').click();
+      await f.page.waitForFunction(()=>document.querySelector('#forgot-form').getAttribute('aria-busy')!== 'true');
+      assert.equal(f.posts.length,2,'Resend requires a new explicit user request');assert.deepEqual(f.posts[0],f.posts[1]);
+      await f.context.close();
+    }
+    for(const options of [{abort:true},{rateLimit:true}]){
+      f=await fixture(browser,'https://knowvia.test/password',390,undefined,false,options);
+      await f.page.getByLabel('Account email',{exact:true}).fill('employee@example.org');await f.page.locator('#forgot-form button').click();
+      await f.page.waitForFunction(()=>document.querySelector('#feedback').className==='error');
+      assert.match(await f.page.locator('#feedback').innerText(),/No automatic retry/);
+      assert.equal(f.posts.length,1);assert(await f.page.locator('#forgot-form button').isEnabled());await f.context.close();
+    }
+    for(const purpose of ['invite','reset']){
+      f=await fixture(browser,'https://knowvia.test/password#purpose='+purpose+'&token='+token,390);
+      assert.match(await f.page.locator('#setup-title').innerText(),purpose==='invite'?/Create/:/Choose/);
+      await f.page.locator('#redeem-form [name=password]').fill('Synthetic-new-phrase!');await f.page.locator('#redeem-form [name=password_confirmation]').fill('Synthetic-new-phrase!');
+      await f.page.locator('#redeem-submit').click();await f.page.locator('#success-section').waitFor({state:'visible'});
+      assert.match(await f.page.locator('#success-title').innerText(),purpose==='invite'?/account is ready/:/reset successfully/);
+      if(process.env.KNOWVIA_ACCOUNT_UX_SCREENSHOT_DIR)await f.page.screenshot({path:path.join(process.env.KNOWVIA_ACCOUNT_UX_SCREENSHOT_DIR,`${purpose}-success-390.png`),fullPage:true});
+      assert.equal(f.posts.length,1);assert(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await f.context.close();
+    }
     f=await fixture(browser,'https://knowvia.test/password#purpose=verify&token='+token);
     await f.page.locator('#redeem-submit').click();
     await f.page.locator('#redeem-form').waitFor({state:'hidden'});
     assert.deepEqual(Object.keys(f.posts[0].body).sort(),['purpose','token']);
     await f.context.close();
+    for(const purpose of ['invite','reset']){
+      for(const width of [360,1280]){
+        f=await fixture(browser,'https://knowvia.test/password#purpose='+purpose+'&token=invalid',width);
+        assert.match(await f.page.locator('#feedback').innerText(),/invalid, expired, or has already been used/);
+        assert.equal(await f.page.locator('#redeem-form').isVisible(),false);assert.equal(f.posts.length,0);
+        assert.equal(await f.page.locator('#new-reset-link').isVisible(),purpose==='reset');
+        if(purpose==='invite')assert.match(await f.page.locator('#link-help-copy').innerText(),/administrator/);
+        assert(await f.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await f.context.close();
+      }
+      f=await fixture(browser,'https://knowvia.test/password#purpose='+purpose+'&token='+token,390,undefined,true);
+      await f.page.locator('#redeem-form [name=password]').fill('short');await f.page.locator('#redeem-form [name=password_confirmation]').fill('short');await f.page.locator('#redeem-submit').click();
+      assert.equal(await f.page.locator('#feedback').innerText(),'Your password must contain at least 12 characters.');assert.equal(f.posts.length,0);
+      await f.page.locator('#redeem-form [name=password]').fill('Synthetic-new-phrase!');await f.page.locator('#redeem-form [name=password_confirmation]').fill('Different-phrase!');await f.page.locator('#redeem-submit').click();
+      assert.equal(await f.page.locator('#feedback').innerText(),'The passwords do not match. Please try again.');assert.equal(f.posts.length,0);
+      await f.page.locator('#redeem-form [name=password_confirmation]').fill('Synthetic-new-phrase!');await f.page.locator('#redeem-submit').click();
+      await f.page.locator('#link-help').waitFor({state:'visible'});
+      assert.match(await f.page.locator('#feedback').innerText(),/does not identify the exact cause/);
+      assert.equal(f.posts.length,1);await f.context.close();
+    }
     f=await fixture(browser,'https://knowvia.test/password',390);
     await f.page.locator('#forgot-form [name=work_email]').fill('employee@example.org');
     await f.page.locator('#forgot-form button').click();
@@ -122,4 +189,4 @@ async function fixture(browser,url,width=1100,status={email_verified:false,email
     await f.context.close();
     console.log('Password UI behavioral checks: PASS');
   }finally{await browser.close();}
-})().catch(()=>{console.error('Password UI behavioral check failed. No credentials or tokens are printed.');process.exit(1);});
+})().catch(error=>{console.error('Password UI behavioral check failed. No credentials or tokens are printed.');console.error((error.stack||'').split('\n').filter(line=>line.trim().startsWith('at ')).join('\n'));process.exit(1);});

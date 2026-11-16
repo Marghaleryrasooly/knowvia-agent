@@ -16,10 +16,12 @@ Take a consistent private backup of the data directory while stopped; protect
 backups because they contain password hashes and sessions. Do not place them in Git.
 
 In a private interactive terminal, use the existing absolute root and exact stored
-email. This example is **for separately authorized future execution only**:
+email. Replace `<EXISTING_ABSOLUTE_DATA_DIRECTORY>` with the already verified
+private data directory; do not create a new directory for recovery. This example
+is **for separately authorized future execution only**:
 
 ```powershell
-.venv\Scripts\python.exe -B -m knowvia.admin_recovery --data-dir "D:\marghalery\knowvia-agent\data" --email admin@novatech.example --acknowledge-local-recovery --maintenance-confirmed
+.venv\Scripts\python.exe -B -m knowvia.admin_recovery --data-dir "<EXISTING_ABSOLUTE_DATA_DIRECTORY>" --email admin@novatech.example --acknowledge-local-recovery --maintenance-confirmed
 ```
 
 The command displays the target and resolved directory. Type both exactly when

@@ -414,6 +414,7 @@ async function initialize() {
     const configResponse = await fetch("/api/config"); const config = await configResponse.json();
     $("auth-demo-guidance").hidden = !config.demo_registration_guidance;
     $("register-tab").hidden = !config.registration_enabled;
+    document.querySelector('.auth-tabs').hidden = !config.registration_enabled;
     $("developer-details-control").hidden = !config.developer_details_enabled;
     if (!config.developer_details_enabled) $("demo-toggle").checked = false;
     if (config.development_identity_override) { await initializeDevelopmentMode(config); return; }

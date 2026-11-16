@@ -9,6 +9,9 @@ not a substitute for current configuration or security checks.
 | Guide | Contents |
 | --- | --- |
 | [Administration](administration.md) | Private bootstrap, trusted roles, account APIs, origin checks and session revocation |
+| [Password management](password-management.md) | Invitations, recovery-email verification, password changes/reset, optional TLS SMTP and upgrade safety |
+| [Private administrator recovery](admin-recovery.md) | Explicitly authorized local recovery of an existing administrator; no public reset endpoint |
+| [Safe local startup](local-startup.md) | Existing-account safeguards and explicit isolated review mode |
 | [Knowledge management](admin-knowledge-management.md) | Markdown staging, source access, publication validation, versions and rollback |
 | [Tailscale HTTPS demonstration](tailscale-demo.md) | Persistent Windows storage, secure process profile, startup and acceptance checklist |
 | [Evaluation catalog](../evaluation/README.md) | Dataset purposes, runners, reproducibility and offline versus live coverage |

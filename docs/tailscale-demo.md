@@ -42,7 +42,7 @@ no developer identity override, no public registration or directory reseeding.
 No account, role, document or conversation is deleted or reset.
 
 The entire existing `KNOWVIA_DATA_DIR` must stay on this laptop's local persistent
-disk (default `D:\marghalery\knowvia-agent\data`). It includes accounts, sessions,
+disk (default `<PROJECT_DIRECTORY>\data`). It includes accounts, sessions,
 authority/roles/admin audit/drafts, directory, conversations, proposals, tickets,
 agent audit, runtime index and `knowledge/versions/` manifests/documents/indexes.
 Use the same root when privately bootstrapping an administrator. Existing local
@@ -52,11 +52,12 @@ is stopped; never copy databases or private uploads into Git or a public directo
 
 ## Exact commands
 
-Run from PowerShell in the project root. Read-only status may require an elevated
+Replace `<PROJECT_DIRECTORY>` with the existing absolute checkout path, then run
+from PowerShell in that project root. Read-only status may require an elevated
 terminal due to Windows Tailscale daemon permissions:
 
 ```powershell
-Set-Location D:\marghalery\knowvia-agent
+Set-Location "<PROJECT_DIRECTORY>"
 & 'C:\Program Files\Tailscale\tailscale.exe' funnel status
 & 'C:\Program Files\Tailscale\tailscale.exe' serve status
 .venv\Scripts\python.exe -B deploy\funnel_start.py --hostname desktop-md6j59m.taild8d8ea.ts.net --check-only

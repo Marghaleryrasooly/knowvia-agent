@@ -39,9 +39,10 @@ Its employee chat and separate admin dashboard make these boundaries testable en
 | Employee assistant | Company Q&A, supporting sources, safe abstention, bounded follow-ups and clarification |
 | Actions | IT ticket proposals, explicit confirmation/cancellation, mock ticket status and notifications |
 | Identity and access | Argon2id passwords, server-side sessions, trusted roles and permission-scoped knowledge |
+| Account security | Administrator invitations, verified recovery email, Change Password, single-use reset links and HTML/plain-text email |
 | Administration | Account provisioning, activation/deactivation, role assignment and sanitized activity |
 | Knowledge management | Markdown staging, explicit source access, validated publication, version history and rollback |
-| Interface | Vanilla web chat, persistent Recent conversations, safe answer formatting and separate admin UI |
+| Interface | Vanilla web chat, persistent Recent conversations, safe answer formatting, separate admin UI and Light/Dark/System appearance |
 | Deployment | HTTPS demonstration, trusted hosts, Secure cookies, mock-only public actions and persistent local storage |
 
 ## Engineering highlights
@@ -69,7 +70,7 @@ evaluation. They are not a mathematical guarantee against every unsupported resp
 | --- | --- |
 | Backend | Python 3.11+, Starlette/ASGI, Uvicorn |
 | Frontend | Vanilla HTML, CSS and JavaScript |
-| Routing | Gemini model-assisted routing in the public demo; deterministic router for local/offline use |
+| Routing | Gemini primary routing; guarded deterministic fallback for eligible transient routing failures; explicit local/offline alternative |
 | Evidence and answers | Groq `openai/gpt-oss-120b` by default |
 | Local inference alternative | Explicitly selected Ollama / Llama 3.2 |
 | Additional inference adapter | Optional Gemini evidence/generation provider, separate from routing |
@@ -86,7 +87,10 @@ flowchart TD
     Browser["Employee web chat / Admin dashboard"] --> API["Starlette backend"]
     API --> Identity["Authentication + trusted permissions"]
     Identity --> Conversation["Conversation coordinator"]
-    Conversation --> Router["Gemini routing / deterministic alternative"]
+    Conversation --> Router["Gemini primary routing"]
+    Router -->|Eligible transient failure only| Fallback["Guarded deterministic routing fallback"]
+    Fallback --> Knowledge
+    Fallback --> Proposal
     Router --> Knowledge["Knowledge skill + source scope"]
     Knowledge --> Retrieval["MiniLM query embedding + JSON vector retrieval"]
     Retrieval --> Evidence["Groq evidence evaluation + strict validation"]
@@ -103,7 +107,9 @@ flowchart TD
 
 1. Authenticate the employee and resolve current trusted permissions.
 2. Resolve only bounded, identity/session-owned conversation context.
-3. Route to knowledge, an action proposal or clarification.
+3. Route to knowledge, an action proposal or clarification. Eligible transient
+   Gemini failures may use the existing guarded deterministic router; invalid
+   proposals are not treated as permission to fall back or execute an action.
 4. For knowledge, retrieve within the selected skill and permitted source scope.
 5. Evaluate answerability, validate supporting IDs and preserve applicable conditions.
 6. Generate from validated support, or abstain without inventing missing company rules.
@@ -130,8 +136,10 @@ semantic check; omitted, reversed, weakened, invented or uncertain conditions fa
 No insufficient decision is automatically promoted to sufficient.
 
 Examples supported by the current fictional corpus include VPN troubleshooting,
-lost-device reporting and the conditional annual-leave allowance. Forgotten-password
-recovery and a vacation-request submission procedure are not documented and should abstain.
+lost-device reporting and the conditional annual-leave allowance. The fictional
+corpus does not document an IT password-recovery procedure or a vacation-request
+submission procedure, so chat must not invent those policies. This is separate
+from Knowvia's implemented account password-reset interface described below.
 
 ## Authentication, authorization and security
 
@@ -146,6 +154,41 @@ recovery and a vacation-request submission procedure are not documented and shou
 - Public HTTPS uses Secure/HttpOnly session cookies, trusted hosts and security headers.
 - User text is escaped; assistant formatting is a bounded Markdown subset with no active HTML or links.
 - Public self-registration and real Jira mutations are disabled in the Funnel profile.
+
+### Invitations and password management
+
+Administrators can retain temporary-password provisioning or invite an employee
+to set an initial password. Invitations preserve the administrator-assigned roles;
+they do not enable public self-registration or administrator self-promotion.
+
+Authenticated employees and administrators can change a password at `/account`
+after supplying the current password. Recovery-email verification is required
+before Forgot Password can issue an eligible reset link. Legacy account addresses
+are not automatically verified. Forgot Password returns a generic response whether
+or not an address is eligible, and issuance is rate-limited.
+
+Invitation links expire after 24 hours; reset and verification links after
+30 minutes. Tokens are single-use, stored only as hashes and bound to purpose
+and current credential state. Successful password changes/resets revoke sessions.
+Existing identities, roles and unrelated records are preserved.
+
+Email delivery is opt-in: the standard-library SMTP adapter requires TLS
+(STARTTLS on 587 or implicit TLS on 465), a trusted HTTPS callback origin and
+private sender credentials. Messages provide HTML and plain-text alternatives,
+without tracking resources. Development/tests use disabled or fake delivery;
+real Gmail invitation/reset delivery was separately verified by the owner, not
+by the offline regression suite. No SMTP credentials are published.
+
+See [password management](docs/password-management.md) and the separate
+[private administrator recovery procedure](docs/admin-recovery.md).
+
+### Appearance
+
+Light remains the first-visit default. Dark uses black/charcoal surfaces and
+Knowvia blue accents; System follows device appearance. A browser-local
+preference persists across navigation and logout. Signed-in employees use the
+profile menu; administrators use sidebar settings, including mobile navigation.
+Login cards intentionally have no Appearance control; account-security pages do.
 
 API keys stay server-side in ignored configuration. Test passwords and fictional
 employee identifiers are not safe public credentials. No default admin password exists.
@@ -206,8 +249,16 @@ The default inference model is `openai/gpt-oss-120b`.
 Evidence uses temperature 0.0, medium reasoning and a 2,048-token completion cap;
 answers use temperature 0.1, low reasoning and a 1,024-token cap.
 Evidence-evaluation and grounded-answer inference do not automatically retry
-transport failures or switch providers. Gemini routing has separate, bounded
-resilience behavior; it does not bypass authorization or evidence validation.
+transport failures or switch providers. Gemini routing has separate bounded
+retries and a guarded deterministic routing fallback for eligible transient
+failures. This is not a switch to another inference provider and does not bypass
+authorization, confirmation or evidence validation.
+
+For optional email delivery, start with the disabled settings in `.env.example`
+and follow [password-management configuration](docs/password-management.md).
+Enter credentials privately; never put passwords in shell arguments, screenshots
+or Git. Do not run storage initialization/migrations against an existing deployment
+as part of ordinary startup; review the documented additive upgrade separately.
 
 ## Running locally
 
@@ -270,8 +321,30 @@ ownership, action confirmation, provider transport and frontend injection protec
 .venv\Scripts\python.exe -B -m knowvia.repository_safety
 ```
 
-The last application verification reported **901 passed, 1 skipped and 3 live tests
-deselected**. This is a recorded result, not a promise about every environment.
+### Release verification recorded on November 16, 2026
+
+| Stage | Recorded evidence and scope |
+| --- | --- |
+| A: offline regression | 1,058 passing tests, plus 2 cached MiniLM tests and 4 supplemental security checks |
+| C: isolated workflows | 465 passing employee/admin checks using disposable storage and fake providers/mail |
+| B: targeted real Groq CLI | One working-hours question passed: 3 Groq calls, 3,428 tokens |
+| B: targeted real web-agent | Same question passed through existing guarded routing fallback: Gemini returned HTTP 504 twice; 3 Groq calls used 3,426 tokens |
+| D: public acceptance | Qualified acceptance: 21 final read-only public checks passed, with employee/admin login credited to owner-observed manual evidence |
+
+The web-agent check exercised authenticated HTTP in an isolated application using
+the actual routing/retrieval/evidence/answering path; it was not a new production
+chat or proof that Gemini primary routing succeeded. Provider availability is
+time-dependent. No new inference-provider fallback was introduced.
+
+Stage D did not newly verify every authenticated public dashboard section,
+conversation-history view, cross-role denial, logout or session-expiration case.
+Those gaps remain documented rather than manufactured passes; existing isolated
+security/workflow coverage remains separate. Stage E publication preparation is
+not another execution of the completed acceptance suites.
+
+These are recorded results, not guarantees for every environment. Private test
+artifacts and provider responses remain outside Git. All 13 historical datasets
+and 16 protected reference hashes were preserved during final verification.
 
 ### Historical model comparison
 
@@ -300,7 +373,10 @@ See [evaluation methodology](evaluation/LOCAL_ACCEPTANCE.md).
 - The knowledge corpus is intentionally small and fictional; undocumented policy is not invented.
 - Demonstration actions are mock IT tickets, not a live Jira deployment.
 - SQLite/local files assume one process/replica and durable storage, not distributed scaling.
-- Password reset, email verification, MFA and enterprise SSO/OIDC are not implemented.
+- MFA and enterprise SSO/OIDC are not implemented.
+- Self-service recovery requires a previously verified eligible recovery address;
+  legacy unverified accounts cannot bypass that requirement. SMTP requires explicit
+  private configuration and delivery is not guaranteed.
 - Registration identity matching is not email-ownership verification; public registration stays disabled.
 - Hosted inference depends on provider availability, free-tier quotas and network access.
 - Funnel availability depends on the host laptop; there is no high-availability hosting guarantee.
@@ -310,6 +386,9 @@ See [evaluation methodology](evaluation/LOCAL_ACCEPTANCE.md).
 
 - [Documentation index](docs/README.md)
 - [Administrator authority and account operations](docs/administration.md)
+- [Invitations, verification, password changes and reset](docs/password-management.md)
+- [Private administrator recovery](docs/admin-recovery.md)
+- [Safe local startup and disposable review](docs/local-startup.md)
 - [Knowledge-document management](docs/admin-knowledge-management.md)
 - [HTTPS demonstration operations](docs/tailscale-demo.md)
 - [Acceptance evaluation and safe runner usage](evaluation/LOCAL_ACCEPTANCE.md)

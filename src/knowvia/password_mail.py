@@ -1,6 +1,7 @@
 """Opt-in TLS SMTP delivery. No credentials or bearer links are logged."""
 from dataclasses import dataclass
 from email.message import EmailMessage
+from html import escape
 import os
 import smtplib
 import ssl
@@ -30,14 +31,41 @@ class SmtpMail:
     enabled = True
 
     def send(self, recipient, purpose, link):
+        # Render only the existing application-created HTTPS password link.
+        parsed = urlsplit(link)
+        if (parsed.scheme != 'https' or not parsed.hostname or parsed.username or parsed.password
+                or parsed.path != '/password' or parsed.query
+                or any(c.isspace() or ord(c)<32 for c in link)):
+            raise MailUnavailable('Email delivery could not be confirmed.')
         message = EmailMessage()
         message['From'] = self.sender
         message['To'] = normalize_work_email(recipient)
         message['Subject'] = {'invite': 'Set up your Knowvia password',
                               'reset': 'Reset your Knowvia password',
                               'verify': 'Verify your Knowvia recovery email'}[purpose]
-        message.set_content('Use this single-use Knowvia link:\n\n' + link +
-                            '\n\nIf you did not expect this message, ignore it. Never share this link.')
+        introduction = {
+            'invite': 'Your administrator has invited you to Knowvia. Create your password using the link below. Your access is assigned by your administrator. This invitation expires after 24 hours.',
+            'reset': 'A password reset was requested for your Knowvia account. Choose a new password using the link below. This link expires after 30 minutes. After a successful reset, your previous sessions will be signed out.',
+            'verify': 'Confirm ownership of your Knowvia recovery email using the link below. This link expires after 30 minutes.',
+        }[purpose]
+        message.set_content(introduction + '\n\n' + link +
+                            '\n\nThis link can be used only once. If you did not expect this message, ignore it. Never share this link or your password. Knowvia will not ask you to email your password.')
+        action = {'invite':'Create your password', 'reset':'Reset your password', 'verify':'Verify your email'}[purpose]
+        message.add_alternative(
+            '<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1">'
+            '<title>'+escape(message['Subject'])+'</title></head>'
+            '<body style="margin:0;padding:24px 12px;background:#ffffff;color:#20242b;font-family:Arial,Helvetica,sans-serif">'
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">'
+            '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;border:1px solid #e7e9ed;border-radius:12px">'
+            '<tr><td style="padding:28px"><p style="margin:0 0 24px;font-size:22px;font-weight:bold;color:#397a9d">Knowvia</p>'
+            '<h1 style="margin:0 0 16px;font-size:22px;line-height:1.3">'+escape(message['Subject'])+'</h1>'
+            '<p style="margin:0 0 24px;font-size:15px;line-height:1.7">'+escape(introduction)+'</p>'
+            '<table role="presentation" cellspacing="0" cellpadding="0"><tr><td bgcolor="#397a9d" style="border-radius:8px">'
+            '<a href="'+escape(link, quote=True)+'" style="display:inline-block;padding:14px 22px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none">'+escape(action)+'</a>'
+            '</td></tr></table><p style="margin:24px 0 0;font-size:13px;line-height:1.7;color:#596471">'
+            'This link can be used only once. If you did not expect this message, ignore it. Never share this link or your password. Knowvia will not ask you to email your password.'
+            '</p><p style="margin:16px 0 0;font-size:12px;line-height:1.6;color:#596471">If the button is unavailable, use the link in the plain-text version of this email.</p>'
+            '</td></tr></table></td></tr></table></body></html>', subtype='html')
         try:
             context = ssl.create_default_context()
             if self.port == 465:
